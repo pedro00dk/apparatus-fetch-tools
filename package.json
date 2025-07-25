@@ -1,7 +1,7 @@
 {
     "name": "@_apparatus_/fetch-tools",
     "description": "A thin wrapper for `fetch` with an `axios` inspired API.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "type": "module",
     "license": "MIT",
     "repository": {
