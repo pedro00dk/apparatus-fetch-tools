@@ -17,11 +17,11 @@ export type FetchOptions = Omit<RequestInit, 'body' | 'headers'> & {
     url?: URL | string
 
     /**
-     * Additional search parameters appended to any previous parameters specified in `url`.
+     * Additional query parameters appended to any previous parameters specified in `url`.
      *
      * Client and call (with higher priority) options are merged.
      */
-    search?: { [_ in string]: unknown }
+    query?: { [_ in string]: unknown }
 
     /**
      * Stricter version of {@linkcode RequestInit} `headers` for easier merging.
@@ -177,7 +177,7 @@ export const call = async <TBody = unknown>(
     call: FetchOptions = {},
 ): Promise<FetchResponse<TBody>> => {
     const url = new URL(path, call.url ?? client?.url)
-    const search = { ...client?.search, ...call?.search }
+    const query = { ...client?.query, ...call?.query }
     const headers = { ...client?.headers, ...call?.headers }
     method = method.toUpperCase()
     if (method === 'HEAD' || method === 'GET') body = undefined
@@ -188,7 +188,11 @@ export const call = async <TBody = unknown>(
     const abortController = new AbortController()
     const signal = AbortSignal.any([abortController.signal, client.signal!, call.signal!].filter(v => v))
 
-    Object.entries(search).forEach(([key, value]) => value && url.searchParams.append(key, `${value}`))
+    Object.entries(query)
+        .filter(([, value]) => value != undefined)
+        .forEach(([key, value]) =>
+            url.searchParams.append(key, typeof value === 'object' ? JSON.stringify(value) : `${value}`),
+        )
     let request = new Request(new Request(url, client), { ...call, method, headers, signal, body: requestBody })
     request = client?.interceptRequest?.(request) ?? request
     request = call?.interceptRequest?.(request) ?? request
