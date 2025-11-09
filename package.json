@@ -34,7 +34,7 @@
     ],
     "scripts": {
         "build": "vite build && tsc",
-        "test": "node --test ./**/*.test.*"
+        "test": "node --import ./src/storage.spec.ts --test ./**/*.test.*"
     },
     "devDependencies": {
         "@types/node": "24.10.0",
