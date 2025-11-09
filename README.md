@@ -12,17 +12,17 @@ npm install @_apparatus_/fetch-tools
 
 ## Features
 
--   🔌 **Fetch Clients** - Reusable clients with predefined options like base URL and headers.
--   🔄 **JSON Handling** - Automatically serializes request body and sets `content-type` header.
--   📦 **Response Parsing** - One-step response handling based on content-type.
--   ⚠️ **Error Handling** - Throws for non-2XX status codes by default, customizable through `status` option.
+-   🔌 **Fetch clients** - Reusable clients with predefined options like base URL and headers.
+-   🔄 **JSON handling** - Automatically serializes request body and sets `content-type` header.
+-   📦 **Response parsing** - One-step response handling based on content-type.
+-   ⚠️ **Error handling** - Throws for non-2XX status codes by default, customizable through `status` option.
 -   ⏱️ **Timeouts** - Request timeout configuration with optional reset on retries.
 -   🔁 **Retries** - Configurable retry attempts and delay for specific status codes.
 -   🎯 **Interceptors** - Hooks to modify requests and responses.
 
 ## Examples
 
-### Basic Usage
+### Basic usage
 
 ```ts
 import { client } from '@_apparatus_/fetch-tools'
@@ -47,16 +47,16 @@ const { body: user } = await api.post<User>('/users', undefined, {
 console.log(user.id)
 ```
 
-### Search parameters
+### Query parameters
 
 ```ts
 const api = client({
     url: 'https://api.example.com',
-    search: { version: '1.0', apiKey: 'xyz' },
+    query: { version: '1.0', apiKey: 'xyz' },
 })
 
 // adds parameters: https://api.example.com/users?version=1.0&apiKey=xyz&orderBy=name
-await api.get('/users', { search: { orderBy: 'name' } })
+await api.get('/users', { query: { orderBy: 'name' } })
 ```
 
 ### Timeouts
@@ -111,7 +111,7 @@ const api = client({
 })
 ```
 
-### Error Handling
+### Error handling
 
 The library throws `FetchError` for network or status code errors:
 
@@ -125,33 +125,3 @@ try {
     }
 }
 ```
-
-## API Reference
-
-### Fetch and call options
-
-The client accepts most standard `fetch` options plus these additional options:
-
--   `url`: Base URL for all requests
--   `search`: Additional URL search parameters
--   `headers`: Requests headers
--   `parse`: Auto-parse response body (default: true)
--   `timeout`: Request timeout in milliseconds
--   `timeoutReset`: Reset timeout on retries
--   `retry`: Number of retry attempts
--   `retryDelay`: Array of delays between retries
--   `retryStatus`: Status codes that trigger retry
--   `status`: Success status codes (1-digit values represent the entire status block)
--   `interceptRequest`: Request interceptor function
--   `interceptResponse`: Response interceptor function
-
-See FetchOptions documentation in code for additional details and default values.
-
-### Response object
-
-Each request returns a `FetchResponse` object containing:
-
--   `request`: Original Request object
--   `response`: Raw Response object
--   `status`: Response status code
--   `body`: Parsed response body
