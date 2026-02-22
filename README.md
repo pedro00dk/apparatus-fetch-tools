@@ -121,7 +121,7 @@ Transform your OpenApi spec into a typescript file and create a client with it, 
 
 ```ts
 // my-api.openapi.ts
-export const MyApiSpec = {
+export type MyApiSpec = {
     // JSON spec here
 }
 ```
