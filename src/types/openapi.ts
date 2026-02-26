@@ -30,11 +30,27 @@ export type FromOpenApiSpec<OpenApiSpec, Strict extends boolean = false> = Prett
 
 type ResolvePaths<Paths> = {
     [Path in keyof Paths]: {
-        [Method in keyof Paths[Path]]: OptionalUndefined<{
-            path: H.Pipe<Paths[Path][Method], [H.Objects.Get<'parameters'>, ParametersToObject<'path'>]>
-            header: H.Pipe<Paths[Path][Method], [H.Objects.Get<'parameters'>, ParametersToObject<'header'>]>
-            cookie: H.Pipe<Paths[Path][Method], [H.Objects.Get<'parameters'>, ParametersToObject<'cookie'>]>
-            query: H.Pipe<Paths[Path][Method], [H.Objects.Get<'parameters'>, ParametersToObject<'query'>]>
+        [Method in keyof Paths[Path] as Method extends Methods ? Method : never]: OptionalUndefined<{
+            path: H.Call<
+                ParametersToObject<'path'>,
+                Default<Get<Paths[Path], 'parameters'>, object, {}> &
+                    Default<Get<Paths[Path][Method], 'parameters'>, object, {}>
+            >
+            header: H.Call<
+                ParametersToObject<'header'>,
+                Default<Get<Paths[Path], 'parameters'>, object, {}> &
+                    Default<Get<Paths[Path][Method], 'parameters'>, object, {}>
+            >
+            cookie: H.Call<
+                ParametersToObject<'cookie'>,
+                Default<Get<Paths[Path], 'parameters'>, object, {}> &
+                    Default<Get<Paths[Path][Method], 'parameters'>, object, {}>
+            >
+            query: H.Call<
+                ParametersToObject<'query' | 'querystring'>,
+                Default<Get<Paths[Path], 'parameters'>, object, {}> &
+                    Default<Get<Paths[Path][Method], 'parameters'>, object, {}>
+            >
             request: H.Pipe<Paths[Path][Method], [H.Objects.Get<'requestBody'>, BodyToObject<'request'>]>
         }> & {
             responses: H.Call<ResponsesToObject, Get<Paths[Path][Method], 'responses'>>
@@ -172,19 +188,14 @@ type OpenApiSpec = {
     paths?: { [path in string]: Path }
 }
 
+type Methods = 'get' | 'put' | 'post' | 'delete' | 'options' | 'head' | 'patch' | 'trace' | 'query'
+
 type Path = {
     $ref?: string
-    get?: Operation
-    put?: Operation
-    post?: Operation
-    delete?: Operation
-    options?: Operation
-    head?: Operation
-    patch?: Operation
-    trace?: Operation
-    query?: Operation
-    additionalOperations?: { [_ in string]: Operation }
     parameters?: (Parameter | Reference)[]
+    additionalOperations?: { [_ in string]: Operation }
+} & {
+    [_ in Methods]?: Operation
 }
 
 type Operation = {
