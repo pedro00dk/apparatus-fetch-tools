@@ -59,18 +59,17 @@ export type Client<Spec, Bypass = true> = {
     $: Bypass extends true ? Client<DefaultSpec, false> : never
 } & {
     [Path in keyof Spec]: {
-        [Method in keyof Spec[Path]]: <
+        [Method in keyof Spec[Path]]: (<
             ResponseOverride = unknown,
             RequestOverride = unknown,
-            ErrorOverride = unknown,
             Options extends ClientRequest<Spec[Path][Method], RequestOverride> = ClientRequest<
                 Spec[Path][Method],
                 RequestOverride
             >,
         >(
             options: Options,
-        ) => Promise<ClientResponse<Spec[Path][Method], ResponseOverride, Options>> & {
-            $: ClientError_<Spec[Path][Method], ErrorOverride, Options>
+        ) => Promise<ClientResponse<Spec[Path][Method], ResponseOverride, Options>>) & {
+            error: ClientError_<Spec[Path][Method]>
         }
     }
 }
@@ -218,16 +217,9 @@ interface ResponseReshape extends H.Fn {
     return: this['arg0'] extends [infer Status extends number, infer Body] ? { status: Status; body: Body } : never
 }
 
-type ClientError_<MethodSpec, BodyOverride, ClientRequest> = H.Pipe<
+type ClientError_<MethodSpec> = H.Pipe<
     Get<MethodSpec, 'responses'>,
-    [
-        number extends keyof Get<MethodSpec, 'responses'>
-            ? H.Identity
-            : H.Objects.Pick<ShortStatus<Default<Get<ClientRequest, 'status'>, number[], [2]>[number]>>,
-        unknown extends BodyOverride ? H.Identity : H.Constant<{ [_: number]: BodyOverride }>,
-        H.Objects.Entries,
-        H.Unions.Map<ErrorReshape>,
-    ]
+    [H.Objects.Pick<ShortStatus<3 | 4 | 5>>, H.Objects.Entries, H.Unions.Map<ErrorReshape>]
 >
 
 interface ErrorReshape extends H.Fn {
