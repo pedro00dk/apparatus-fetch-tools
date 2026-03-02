@@ -64,9 +64,7 @@ export const call = async (
     const url = new URL(resolveUrl(`${baseUrl}`, path))
     Object.entries(queries)
         .filter(([, value]) => value != undefined)
-        .forEach(([key, value]) =>
-            url.searchParams.append(key, typeof value === 'object' ? JSON.stringify(value) : `${value}`),
-        )
+        .forEach(([key, value]) => [value].flat().forEach(v => url.searchParams.append(key, `${v}`)))
 
     const isJson = !!rawBody && jsonPrototypes.includes(Object.getPrototypeOf(rawBody))
     if (isJson && !headers['content-type']) headers['content-type'] = 'application/json'
