@@ -11,7 +11,6 @@ import {
     H_IsSuperType,
     H_Union_Include,
     OptionalUndefined,
-    Prettify,
 } from './util'
 
 /**
@@ -20,53 +19,53 @@ import {
  * @param OpenApiSpec The OpenAPI Specification type to convert.
  * @param Strict Ensure the result matches ClientSpec. More precise but impacts performance, use for checking only.
  */
-export type FromOpenApiSpec<OpenApiSpec, Strict extends boolean = false> = Prettify<
-    Strict extends false
-        ? Prettify<ResolvePaths<Deref<Get<OpenApiSpec, 'paths'>, OpenApiSpec>>>
-        : ResolvePaths<Deref<Get<OpenApiSpec, 'paths'>, OpenApiSpec>> extends infer ResolvedPaths extends ClientSpec
-          ? Prettify<ResolvedPaths>
-          : never
->
+export type FromOpenApiSpec<OpenApiSpec, Strict extends boolean = false> = Strict extends false
+    ? ResolvePaths<Get<OpenApiSpec, 'paths'>, OpenApiSpec>
+    : ResolvePaths<Get<OpenApiSpec, 'paths'>, OpenApiSpec> extends infer ResolvedPaths extends ClientSpec
+      ? ResolvedPaths
+      : never
 
-type ResolvePaths<Paths> = {
-    [Path in keyof Paths]: {
-        [Method in keyof Paths[Path] as Method extends Methods ? Method : never]: OptionalUndefined<{
-            path: H.Call<
-                ParametersToObject<'path'>,
-                [
-                    ...Default<Get<Paths[Path], 'parameters'>, Array<unknown>, []>,
-                    ...Default<Get<Paths[Path][Method], 'parameters'>, Array<unknown>, []>,
-                ]
-            >
-            header: H.Call<
-                ParametersToObject<'header'>,
-                [
-                    ...Default<Get<Paths[Path], 'parameters'>, Array<unknown>, []>,
-                    ...Default<Get<Paths[Path][Method], 'parameters'>, Array<unknown>, []>,
-                ]
-            >
-            cookie: H.Call<
-                ParametersToObject<'cookie'>,
-                [
-                    ...Default<Get<Paths[Path], 'parameters'>, Array<unknown>, []>,
-                    ...Default<Get<Paths[Path][Method], 'parameters'>, Array<unknown>, []>,
-                ]
-            >
-            query: H.Call<
-                ParametersToObject<'query' | 'querystring'>,
-                [
-                    ...Default<Get<Paths[Path], 'parameters'>, Array<unknown>, []>,
-                    ...Default<Get<Paths[Path][Method], 'parameters'>, Array<unknown>, []>,
-                ]
-            >
-            request: H.Pipe<Paths[Path][Method], [H.Objects.Get<'requestBody'>, BodyToObject<'request'>]>
-        }> & {
-            responses: H.Call<ResponsesToObject, Get<Paths[Path][Method], 'responses'>>
-            fallback: NonNullable<
-                H.Call<BodyToObject<'response'>, GetOr<Get<Paths[Path][Method], 'responses'>, 'default', unknown>>
-            >
-        }
-    }
+type ResolvePaths<Paths, Spec> = {
+    [Path in keyof Paths]: ResolvePath<Deref<Paths[Path], Spec>>
+}
+
+type ResolvePath<Path> = {
+    [Method in keyof Path as Method extends Methods ? Method : never]: ResolveMethod<Path, Path[Method]>
+}
+
+type ResolveMethod<Path, Method> = OptionalUndefined<{
+    path: H.Call<
+        ParametersToObject<'path'>,
+        [
+            ...Default<Get<Path, 'parameters'>, Array<unknown>, []>,
+            ...Default<Get<Method, 'parameters'>, Array<unknown>, []>,
+        ]
+    >
+    header: H.Call<
+        ParametersToObject<'header'>,
+        [
+            ...Default<Get<Path, 'parameters'>, Array<unknown>, []>,
+            ...Default<Get<Method, 'parameters'>, Array<unknown>, []>,
+        ]
+    >
+    cookie: H.Call<
+        ParametersToObject<'cookie'>,
+        [
+            ...Default<Get<Path, 'parameters'>, Array<unknown>, []>,
+            ...Default<Get<Method, 'parameters'>, Array<unknown>, []>,
+        ]
+    >
+    query: H.Call<
+        ParametersToObject<'query' | 'querystring'>,
+        [
+            ...Default<Get<Path, 'parameters'>, Array<unknown>, []>,
+            ...Default<Get<Method, 'parameters'>, Array<unknown>, []>,
+        ]
+    >
+    request: H.Pipe<Method, [H.Objects.Get<'requestBody'>, BodyToObject<'request'>]>
+}> & {
+    responses: H.Call<ResponsesToObject, Get<Method, 'responses'>>
+    fallback: NonNullable<H.Call<BodyToObject<'response'>, GetOr<Get<Method, 'responses'>, 'default', unknown>>>
 }
 
 interface ParametersToObject<In> extends H.Fn {
@@ -162,19 +161,17 @@ interface SchemaToObject extends H.Fn {
                                       | { type?: never; properties: infer Properties }
                                       | { type?: never; additionalProperties: infer Additional }
                                   ) & { required?: infer Required; additionalProperties?: infer Additional }
-                                ? Prettify<
-                                      {
-                                          [K in keyof Properties as K extends Default<Required, string[], []>[number]
-                                              ? K
-                                              : never]: H.Call<SchemaToObject, Properties[K]>
-                                      } & {
-                                          [K in keyof Properties as K extends Default<Required, string[], []>[number]
-                                              ? never
-                                              : K]?: H.Call<SchemaToObject, Properties[K]>
-                                      } & (unknown extends Additional
-                                              ? unknown
-                                              : { [_: string]: H.Call<SchemaToObject, Additional> })
-                                  >
+                                ? {
+                                      [K in keyof Properties as K extends Default<Required, string[], []>[number]
+                                          ? K
+                                          : never]: H.Call<SchemaToObject, Properties[K]>
+                                  } & {
+                                      [K in keyof Properties as K extends Default<Required, string[], []>[number]
+                                          ? never
+                                          : K]?: H.Call<SchemaToObject, Properties[K]>
+                                  } & (unknown extends Additional
+                                          ? unknown
+                                          : { [_: string]: H.Call<SchemaToObject, Additional> })
                                 : this['arg0'] extends { type: (infer Item)[] }
                                   ? H.Call<SchemaToObject, { type: Item } & Omit<this['arg0'], 'type'>>
                                   : unknown

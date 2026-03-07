@@ -1,12 +1,6 @@
 import * as H from 'hotscript'
 import { ToNumber } from 'hotscript/dist/internals/numbers/impl/utils'
 
-export type Prettify<T> = T extends string | number | boolean | symbol | null | undefined
-    ? T
-    : T extends object
-      ? { [K in keyof T]: Prettify<T[K]> } & unknown
-      : T
-
 export type Get<Object, Key> = Key extends keyof Object ? Object[Key] : undefined
 export type GetOr<Object, Key, Default> = Key extends keyof Object ? Object[Key] : Default
 export type GetDeep<Base, Path> = Path extends `${infer Next}/${infer Rest}`
