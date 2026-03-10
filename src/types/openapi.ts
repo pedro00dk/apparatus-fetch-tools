@@ -132,49 +132,51 @@ interface BodyToObject<In> extends H.Fn {
 }
 
 interface SchemaToObject extends H.Fn {
-    return: (this['arg0'] extends { nullable: true } ? null | undefined : never) | this['arg0'] extends true
-        ? unknown
-        : this['arg0'] extends false
-          ? never
-          : this['arg0'] extends { const: infer Const }
-            ? Const
-            : this['arg0'] extends { enum: (infer Item)[] }
-              ? Item
-              : this['arg0'] extends { type: 'null' }
-                ? null
-                : this['arg0'] extends { type: 'boolean' }
-                  ? boolean
-                  : this['arg0'] extends { type: 'number' | 'integer' }
-                    ? number
-                    : this['arg0'] extends { type: 'string' }
-                      ? string
-                      : this['arg0'] extends { type: 'array'; items: infer Items }
-                        ? H.Call<SchemaToObject, Items>[]
-                        : this['arg0'] extends { allOf: [infer Head, ...infer Tail] }
-                          ? H.Call<SchemaToObject, Head> & H.Call<SchemaToObject, { allOf: Tail }>
-                          : this['arg0'] extends { anyOf: [infer Head, ...infer Tail] }
-                            ? Partial<H.Call<SchemaToObject, Head>> & H.Call<SchemaToObject, { anyOf: Tail }>
-                            : this['arg0'] extends { oneOf: [infer Head, ...infer Tail] }
-                              ? Partial<H.Call<SchemaToObject, Head>> & H.Call<SchemaToObject, { oneOf: Tail }>
-                              : this['arg0'] extends (
-                                      | { type: 'object'; properties?: infer Properties }
-                                      | { type?: never; properties: infer Properties }
-                                      | { type?: never; additionalProperties: infer Additional }
-                                  ) & { required?: infer Required; additionalProperties?: infer Additional }
-                                ? {
-                                      [K in keyof Properties as K extends Default<Required, string[], []>[number]
-                                          ? K
-                                          : never]: H.Call<SchemaToObject, Properties[K]>
-                                  } & {
-                                      [K in keyof Properties as K extends Default<Required, string[], []>[number]
-                                          ? never
-                                          : K]?: H.Call<SchemaToObject, Properties[K]>
-                                  } & (unknown extends Additional
-                                          ? unknown
-                                          : { [_: string]: H.Call<SchemaToObject, Additional> })
-                                : this['arg0'] extends { type: (infer Item)[] }
-                                  ? H.Call<SchemaToObject, { type: Item } & Omit<this['arg0'], 'type'>>
-                                  : unknown
+    return:
+        | (this['arg0'] extends { nullable: true } ? null : never)
+        | (this['arg0'] extends true
+              ? unknown
+              : this['arg0'] extends false
+                ? never
+                : this['arg0'] extends { const: infer Const }
+                  ? Const
+                  : this['arg0'] extends { enum: (infer Item)[] }
+                    ? Item
+                    : this['arg0'] extends { type: 'null' }
+                      ? null
+                      : this['arg0'] extends { type: 'boolean' }
+                        ? boolean
+                        : this['arg0'] extends { type: 'number' | 'integer' }
+                          ? number
+                          : this['arg0'] extends { type: 'string' }
+                            ? string
+                            : this['arg0'] extends { type: 'array'; items: infer Items }
+                              ? H.Call<SchemaToObject, Items>[]
+                              : this['arg0'] extends { allOf: [infer Head, ...infer Tail] }
+                                ? H.Call<SchemaToObject, Head> & H.Call<SchemaToObject, { allOf: Tail }>
+                                : this['arg0'] extends { anyOf: [infer Head, ...infer Tail] }
+                                  ? Partial<H.Call<SchemaToObject, Head>> & H.Call<SchemaToObject, { anyOf: Tail }>
+                                  : this['arg0'] extends { oneOf: [infer Head, ...infer Tail] }
+                                    ? Partial<H.Call<SchemaToObject, Head>> & H.Call<SchemaToObject, { oneOf: Tail }>
+                                    : this['arg0'] extends (
+                                            | { type: 'object'; properties?: infer Properties }
+                                            | { type?: never; properties: infer Properties }
+                                            | { type?: never; additionalProperties: infer Additional }
+                                        ) & { required?: infer Required; additionalProperties?: infer Additional }
+                                      ? {
+                                            [K in keyof Properties as K extends Default<Required, string[], []>[number]
+                                                ? K
+                                                : never]: H.Call<SchemaToObject, Properties[K]>
+                                        } & {
+                                            [K in keyof Properties as K extends Default<Required, string[], []>[number]
+                                                ? never
+                                                : K]?: H.Call<SchemaToObject, Properties[K]>
+                                        } & (unknown extends Additional
+                                                ? unknown
+                                                : { [_: string]: H.Call<SchemaToObject, Additional> })
+                                      : this['arg0'] extends { type: (infer Item)[] }
+                                        ? H.Call<SchemaToObject, { type: Item } & Omit<this['arg0'], 'type'>>
+                                        : unknown)
 }
 
 /**
