@@ -7,10 +7,11 @@ export type GetDeep<Base, Path> = Path extends `${infer Next}/${infer Rest}`
     ? GetDeep<Get<Base, Next>, Rest>
     : Get<Base, Path>
 
-export type Deref<Cursor, Base = Cursor> = Cursor extends { $ref: `#/${infer Path}` }
-    ? Deref<GetDeep<Base, Path>, Base>
+export type Deref<Cursor, Base = Cursor> = Cursor extends { $ref: `#/${infer Path}` } ? GetDeep<Base, Path> : Cursor
+export type DerefDeep<Cursor, Base = Cursor> = Cursor extends { $ref: `#/${infer Path}` }
+    ? DerefDeep<GetDeep<Base, Path>, Base>
     : Cursor extends object
-      ? { [K in keyof Cursor]: Deref<Cursor[K], Base> }
+      ? { [K in keyof Cursor]: DerefDeep<Cursor[K], Base> }
       : Cursor
 
 export type Default<Value, Expect, Default> = Value extends Expect ? Value : Default
@@ -34,6 +35,10 @@ export type ShortStatus<T> = T extends 1
             : T
 
 //
+
+export interface H_Deref<Base> extends H.Fn {
+    return: Deref<this['arg0'], Base>
+}
 
 export interface H_If<Condition extends H.Fn, Then extends H.Fn, Else extends H.Fn = H.Identity> extends H.Fn {
     return: H.Call<Condition, this['arg0']> extends true ? H.Call<Then, this['arg0']> : H.Call<Else, this['arg0']>
