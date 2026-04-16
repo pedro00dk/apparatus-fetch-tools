@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, expect, mock, test } from 'bun:test'
 import { default as FormData } from 'form-data'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { client } from './client.ts'
+import { client } from './client'
 
 const url = 'http://api.example.com'
 const msw = setupServer()

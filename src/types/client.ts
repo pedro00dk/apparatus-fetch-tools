@@ -150,7 +150,7 @@ export type ClientRequest<
      *
      * @param request Request to mutate or override.
      */
-    interceptRequest?: (request: Request) => Request | void
+    interceptRequest?: (request: Request) => void | Request | Promise<void | Request>
 
     /**
      * Intercept the received {@linkcode Response} object after successful status check.
@@ -160,7 +160,7 @@ export type ClientRequest<
      *
      * @param response Response to mutate or override.
      */
-    interceptResponse?: (response: Response) => Response | void
+    interceptResponse?: (response: Response) => void | Response | Promise<void | Response>
 } & OptionalUndefined<{
         /**
          * Path template parameters to replace in the `url` field. It uses the `{key}` syntax.

@@ -74,9 +74,9 @@ export const call = async (
     const signals = [abortController.signal, ...options.map(({ signal }) => signal!).filter(v => v)]
     const signal = AbortSignal.any(signals)
 
-    const request = options.reduce(
-        ($, { interceptRequest }) => interceptRequest?.($) ?? $,
-        new Request(url, { ...(merged as RequestInit), method, headers, signal, body }),
+    const request = await options.reduce(
+        async ($, { interceptRequest }) => (await interceptRequest?.(await $)) ?? $,
+        Promise.resolve(new Request(url, { ...(merged as RequestInit), method, headers, signal, body })),
     )
 
     let handle!: number
@@ -117,7 +117,10 @@ export const call = async (
                 : await response.blob()
 
     if (!requestSuccess) throw new ClientError(request, response, 'status', response.status, responseBody)
-    response = options.reduce(($, { interceptResponse }) => interceptResponse?.($) ?? $, response)
+    response = await options.reduce(
+        async ($, { interceptResponse }) => (await interceptResponse?.(await $)) ?? $,
+        Promise.resolve(response),
+    )
     return { request, response, status: response.status, body: responseBody }
 }
 

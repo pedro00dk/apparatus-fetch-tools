@@ -1,18 +1,17 @@
 {
-    "include": ["src"],
-    "exclude": ["**/*.test.*"],
     "compilerOptions": {
-        "allowImportingTsExtensions": true,
         "declaration": true,
-        "declarationDir": "./dist/",
         "emitDeclarationOnly": true,
         "erasableSyntaxOnly": true,
         "module": "esnext",
         "moduleResolution": "bundler",
         "noUnusedLocals": true,
         "noUnusedParameters": true,
+        "outDir": "./dist/",
+        "rootDir": "./src/",
         "skipLibCheck": true,
         "strict": true,
-        "target": "esnext"
+        "target": "esnext",
+        "types": ["bun"]
     }
 }

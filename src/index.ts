@@ -1,3 +1,3 @@
-export * from './client.ts'
-export * from './types/client.ts'
-export * from './types/openapi.ts'
+export * from './client'
+export * from './types/client'
+export * from './types/openapi'
