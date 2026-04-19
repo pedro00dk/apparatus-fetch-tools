@@ -60,7 +60,7 @@ export const call = async (
     if (cookies.length) headers['cookie'] = cookies.map(([key, value]) => `${key}=${value}`).join('; ')
 
     method = method.toUpperCase()
-    path = `${path}`.replace(/{([^.]+?)}/g, (_, k) => encodeURI(`${paths[k] ?? ''}`) || `{${k}}`)
+    path = `${path}`.replace(/{([^.]+?)}/g, (_, k) => encodeURIComponent(`${paths[k] ?? ''}`) || `{${k}}`)
     const url = new URL(resolveUrl(`${baseUrl}`, path))
     Object.entries(queries)
         .filter(([, value]) => value != undefined)
