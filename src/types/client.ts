@@ -1,5 +1,4 @@
-import * as H from 'hotscript'
-import { Default, Get, H_If, H_IsSubType, OptionalUndefined, ShortStatus } from './util'
+import { Default, Get, OptionalUndefined, ShortStatus } from './util'
 
 /**
  * Base API specification type used to create typed {@linkcode Client}s.
@@ -62,13 +61,13 @@ export type Client<Spec, Bypass = true> = {
         [Method in keyof Spec[Path]]: (<
             ResponseOverride = unknown,
             RequestOverride = unknown,
-            Options extends ClientRequest<Spec[Path][Method], RequestOverride> = ClientRequest<
+            Request extends ClientRequest<Spec[Path][Method], RequestOverride> = ClientRequest<
                 Spec[Path][Method],
                 RequestOverride
             >,
         >(
-            options: Options,
-        ) => Promise<ClientResponse<Spec[Path][Method], ResponseOverride, Options>>) & {
+            request: Request,
+        ) => Promise<ClientResponse<Spec[Path][Method], ResponseOverride, Request>>) & {
             error: ClientError_<Spec[Path][Method]>
         }
     }
@@ -190,43 +189,47 @@ export type ClientRequest<
         body: unknown extends BodyOverride ? Get<MethodSpec, 'request'> : BodyOverride
     }>
 
+/** Keep only the response entries whose status code matches `Statuses`. */
+type PickStatus<Responses, Statuses> = {
+    [Status in keyof Responses as Status extends Statuses ? Status : never]: Responses[Status]
+}
+
+/** Turn a `{ status: body }` map into a union of `{ status, body, request, response }`. */
+type ResponseUnion<Responses> = {
+    [Status in keyof Responses]: {
+        status: Status extends number ? Status : number
+        body: Responses[Status]
+        request: Request
+        response: Response
+    }
+}[keyof Responses]
+
 /**
  * ClientResponse wraps request and response objects and provide a typed `status` and `body`.
  */
 export type ClientResponse<
     MethodSpec = DefaultSpec[string][DefaultMethod],
     BodyOverride = unknown,
-    ClientRequest_ = ClientRequest<MethodSpec, unknown>,
-> = H.Pipe<
-    Get<MethodSpec, 'responses'>,
-    [
-        H.Objects.Pick<ShortStatus<Default<Get<ClientRequest_, 'status'>, number[], [2]>[number]>>,
-        H_If<
-            H_IsSubType<{ [_ in any]: never }>,
-            H.Constant<{ [_ in number]: Get<MethodSpec, 'fallback'> | undefined }>,
-            H.Identity
-        >,
-        unknown extends BodyOverride ? H.Identity : H.Constant<{ [_: number]: BodyOverride }>,
-        H.Objects.Entries,
-        H.Unions.Map<ResponseReshape>,
-        H.Unions.Map<H.Objects.Assign<{ request: Request; response: Response }>>,
-    ]
+    Request = ClientRequest<MethodSpec, unknown>,
+> = ResponseUnion<
+    unknown extends BodyOverride
+        ? PickStatus<
+              Get<MethodSpec, 'responses'>,
+              ShortStatus<Default<Get<Request, 'status'>, number[], [2]>[number]>
+          > extends infer Picked
+            ? [keyof Picked] extends [never]
+                ? { [_ in number]: Get<MethodSpec, 'fallback'> | undefined } // no matching status -> fallback
+                : Picked
+            : never
+        : { [_ in number]: BodyOverride } // explicit body override
 >
 
-interface ResponseReshape extends H.Fn {
-    return: this['arg0'] extends [infer Status extends number, infer Body] ? { status: Status; body: Body } : never
-}
-
-type ClientError_<MethodSpec> = H.Pipe<
-    Get<MethodSpec, 'responses'>,
-    [H.Objects.Pick<ShortStatus<3 | 4 | 5>>, H.Objects.Entries, H.Unions.Map<ErrorReshape>]
->
-
-interface ErrorReshape extends H.Fn {
-    return: this['arg0'] extends [infer Status extends number, infer Body]
-        ? ClientError<Status, Body>
-        : ClientError<number, unknown>
-}
+type ClientError_<MethodSpec> =
+    PickStatus<Get<MethodSpec, 'responses'>, ShortStatus<3 | 4 | 5>> extends infer Errors
+        ? {
+              [Status in keyof Errors]: ClientError<Status extends number ? Status : number, Errors[Status]>
+          }[keyof Errors]
+        : never
 /**
  * ClientError wraps request and response objects and provide a typed `status` and `body`.
  */

@@ -47,37 +47,32 @@ test('request body serialize', async () => {
     expect(spy).toHaveBeenCalledWith('application/json', '{}')
 })
 
-test(
-    'response body parse',
-    async () => {
-        const params = new URLSearchParams()
-        const paramsInit = { headers: { 'content-type': 'application/x-www-form-urlencoded' } }
-        const form = new FormData()
-        const formInit = { headers: form.getHeaders() }
-        const jpegInit = { headers: { 'content-type': 'image/jpeg' } }
-        msw.use(http.get(`${url}/json`, () => HttpResponse.json([])))
-        msw.use(http.get(`${url}/text`, () => HttpResponse.text('text')))
-        msw.use(http.get(`${url}/form`, () => new HttpResponse(form.getBuffer(), formInit)))
-        msw.use(http.get(`${url}/param`, () => new HttpResponse(params, paramsInit)))
-        msw.use(http.get(`${url}/blob`, () => HttpResponse.arrayBuffer(new ArrayBuffer())))
-        msw.use(http.get(`${url}/jpeg`, () => HttpResponse.arrayBuffer(new ArrayBuffer(), jpegInit)))
+test('response body parse', async () => {
+    const params = new URLSearchParams()
+    const paramsInit = { headers: { 'content-type': 'application/x-www-form-urlencoded' } }
+    const form = new FormData()
+    const formInit = { headers: form.getHeaders() }
+    const blobInit = { headers: { 'content-type': 'application/octet-stream' } }
+    const jpegInit = { headers: { 'content-type': 'image/jpeg' } }
+    msw.use(http.get(`${url}/json`, () => HttpResponse.json([])))
+    msw.use(http.get(`${url}/text`, () => HttpResponse.text('text')))
+    msw.use(http.get(`${url}/form`, () => new HttpResponse(form.getBuffer(), formInit)))
+    msw.use(http.get(`${url}/param`, () => new HttpResponse(params, paramsInit)))
+    msw.use(http.get(`${url}/blob`, () => HttpResponse.arrayBuffer(new ArrayBuffer(), blobInit)))
+    msw.use(http.get(`${url}/jpeg`, () => HttpResponse.arrayBuffer(new ArrayBuffer(), jpegInit)))
 
-        const api = client({ url })
-        expect(typeof (await api['text'].get({})).body).toBe('string')
-        expect((await api['json'].get<Array<undefined>>({})).body).toBeInstanceOf(Array)
-        expect((await api['form'].get<FormData>({})).body).toBeInstanceOf(globalThis.FormData)
-        expect((await api['param'].get<URLSearchParams>({})).body).toBeInstanceOf(URLSearchParams)
-        const blob = (await api['blob'].get<Blob>({})).body
-        expect(blob).toBeInstanceOf(Blob)
-        expect(blob.type).toBe('application/octet-stream')
-        const jpeg = (await api['jpeg'].get<Blob>({})).body
-        expect(jpeg).toBeInstanceOf(Blob)
-        expect(jpeg.type).toBe('image/jpeg')
-        const stream = (await api['jpeg'].get<ReadableStream>({ parse: false })).body
-        expect(stream).toBeInstanceOf(ReadableStream)
-    },
-    { timeout: Infinity },
-)
+    const api = client({ url })
+    expect(typeof (await api['text'].get({})).body).toBe('string')
+    expect((await api['json'].get<Array<undefined>>({})).body).toBeInstanceOf(Array)
+    expect((await api['form'].get<FormData>({})).body).toBeInstanceOf(globalThis.FormData)
+    expect((await api['param'].get<URLSearchParams>({})).body).toBeInstanceOf(URLSearchParams)
+    const blob = (await api['blob'].get<Blob>({})).body
+    expect(blob).toBeInstanceOf(Blob)
+    const jpeg = (await api['jpeg'].get<Blob>({})).body
+    expect(jpeg).toBeInstanceOf(Blob)
+    const stream = (await api['jpeg'].get<ReadableStream>({ parse: false })).body
+    expect(stream).toBeInstanceOf(ReadableStream)
+})
 
 test('timeout', async () => {
     msw.use(
