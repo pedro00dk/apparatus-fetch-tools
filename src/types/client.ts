@@ -1,4 +1,4 @@
-import { Default, Get, OptionalUndefined, ShortStatus } from './util'
+import { Default, ExpandBlock, Get, OptionalEmpty, OptionalUndefined, StatusBlock, StatusDefault } from './util'
 
 /**
  * Base API specification type used to create typed {@linkcode Client}s.
@@ -6,13 +6,12 @@ import { Default, Get, OptionalUndefined, ShortStatus } from './util'
 export type ClientSpec<Methods extends string = string> = {
     [Path in string]: {
         [Method in Methods]?: {
-            path?: { [_ in string]: unknown }
-            query?: { [_ in string]: unknown }
-            header?: { [_ in string]: string }
-            cookie?: { [_ in string]: string }
-            request?: BodyInit | object | string | number | bigint | boolean | null
+            path: { [_ in string]: unknown }
+            query: { [_ in string]: unknown }
+            header: { [_ in string]: string }
+            cookie: { [_ in string]: string }
+            request: BodyInit | object | string | number | bigint | boolean | null | undefined
             responses: { [_ in number]: unknown }
-            fallback: unknown
         }
     }
 }
@@ -23,13 +22,12 @@ export type ClientSpec<Methods extends string = string> = {
 export type DefaultSpec<Methods extends string = DefaultMethod> = {
     [Path in string]: {
         [Method in Methods]: {
-            path?: { [_ in string]: unknown }
-            query?: { [_ in string]: unknown }
-            header?: { [_ in string]: string }
-            cookie?: { [_ in string]: string }
-            request?: BodyInit | object | string | number | bigint | boolean | null
+            path: { [_ in string]: unknown }
+            query: { [_ in string]: unknown }
+            header: { [_ in string]: string }
+            cookie: { [_ in string]: string }
+            request: BodyInit | object | string | number | bigint | boolean | null | undefined
             responses: { [_ in number]: unknown }
-            fallback: unknown
         }
     }
 }
@@ -139,7 +137,7 @@ export type ClientRequest<
      *
      * Default: `[2]`
      */
-    status?: (keyof Get<MethodSpec, 'responses'> | 0 | 1 | 2 | 3 | 4 | 5 | (number & {}))[]
+    status?: (Exclude<keyof Get<MethodSpec, 'responses'>, StatusDefault> | 0 | StatusBlock | (number & {}))[]
 
     /**
      * Intercept the resolved {@linkcode Request} object before the {@linkcode call} call.
@@ -160,7 +158,7 @@ export type ClientRequest<
      * @param response Response to mutate or override.
      */
     interceptResponse?: (response: Response) => void | Response | Promise<void | Response>
-} & OptionalUndefined<{
+} & OptionalEmpty<{
         /**
          * Path template parameters to replace in the `url` field. It uses the `{key}` syntax.
          *
@@ -172,7 +170,7 @@ export type ClientRequest<
          * Query parameters appended to any existing parameters specified in `url`.
          */
         query: Get<MethodSpec, 'query'>
-
+    }> & {
         /**
          * Stricter version of {@linkcode RequestInit} `headers` for simpler merging.
          */
@@ -182,54 +180,88 @@ export type ClientRequest<
          * Cookies to be included in the request.
          */
         cookie?: Partial<Get<MethodSpec, 'cookie'>>
-
+    } & OptionalUndefined<{
         /**
          * Request body.
          */
         body: unknown extends BodyOverride ? Get<MethodSpec, 'request'> : BodyOverride
     }>
 
-/** Keep only the response entries whose status code matches `Statuses`. */
-type PickStatus<Responses, Statuses> = {
-    [Status in keyof Responses as Status extends Statuses ? Status : never]: Responses[Status]
-}
-
-/** Turn a `{ status: body }` map into a union of `{ status, body, request, response }`. */
-type ResponseUnion<Responses> = {
-    [Status in keyof Responses]: {
-        status: Status extends number ? Status : number
-        body: Responses[Status]
-        request: Request
-        response: Response
-    }
-}[keyof Responses]
-
 /**
  * ClientResponse wraps request and response objects and provide a typed `status` and `body`.
+ *
+ * The `status` field of the request narrows the resulting union. Each requested code is resolved
+ * independently (see {@linkcode ResolveStatuses}) and the resolved entries are unioned together.
  */
 export type ClientResponse<
     MethodSpec = DefaultSpec[string][DefaultMethod],
     BodyOverride = unknown,
     Request = ClientRequest<MethodSpec, unknown>,
-> = ResponseUnion<
-    unknown extends BodyOverride
-        ? PickStatus<
-              Get<MethodSpec, 'responses'>,
-              ShortStatus<Default<Get<Request, 'status'>, number[], [2]>[number]>
-          > extends infer Picked
-            ? [keyof Picked] extends [never]
-                ? { [_ in number]: Get<MethodSpec, 'fallback'> | undefined } // no matching status -> fallback
-                : Picked
-            : never
-        : { [_ in number]: BodyOverride } // explicit body override
->
+> = unknown extends BodyOverride
+    ? ResolveStatuses<Get<MethodSpec, 'responses'>, Default<Get<Request, 'status'>, number[], [2]>[number], Request>
+    : ResponseEntry<number, BodyOverride, Request>
+
+/**
+ * Resolve the requested status codes into a union of {@linkcode ResponseEntry}.
+ *
+ * Wildcards (single block digits, e.g. `2`) and exact codes (e.g. `200`) are resolved separately
+ * since the responses map already has its wildcards expanded into exact codes with collisions handled.
+ */
+type ResolveStatuses<Responses, Codes extends number, Request> =
+    | ResolveExact<Responses, Exclude<Codes, StatusBlock>, Request>
+    | ResolveWildcard<Responses, Extract<Codes, StatusBlock>, Request>
+
+/**
+ * Resolve an exact code: exact response > fallback (`-1`) > `unknown`.
+ * The literal code is always preserved as the entry `status`.
+ */
+type ResolveExact<Responses, Codes extends number, Request> = Codes extends number
+    ? ResponseEntry<Codes, Codes extends keyof Responses ? Responses[Codes] : FallbackBody<Responses>, Request>
+    : never
+
+/**
+ * Resolve a wildcard block: every exact code of the block present in `Responses` is added with its own
+ * literal `status`. If the block matches nothing, it expands to the block's literal codes carrying the
+ * fallback (`-1`) body, or `unknown` when no fallback exists.
+ *
+ * The block is expanded to literal codes (rather than collapsed to `number`) so the fallback body stays
+ * confined to its own status codes and does not leak into the narrowing of unrelated codes.
+ */
+type ResolveWildcard<Responses, Wilds extends StatusBlock, Request> = Wilds extends StatusBlock
+    ? Extract<ExpandBlock<Wilds>, keyof Responses> extends infer Matched
+        ? [Matched] extends [never]
+            ? ExpandBlock<Wilds> extends infer Code
+                ? Code extends number
+                    ? ResponseEntry<Code, FallbackBody<Responses>, Request>
+                    : never
+                : never
+            : Matched extends number
+              ? ResponseEntry<Matched, Get<Responses, Matched>, Request>
+              : never
+        : never
+    : never
+
+/** Body of the fallback (`-1`) response, or `unknown` when the spec declares no fallback. */
+type FallbackBody<Responses> = StatusDefault extends keyof Responses ? Responses[StatusDefault] : unknown
+
+/** A single resolved response: typed `status` and `body` alongside the raw request/response objects. */
+type ResponseEntry<Status extends number, Body, Request> = {
+    status: Status
+    body: Body
+    request: Request
+    response: Response
+}
 
 type ClientError_<MethodSpec> =
-    PickStatus<Get<MethodSpec, 'responses'>, ShortStatus<3 | 4 | 5>> extends infer Errors
+    PickStatus<Get<MethodSpec, 'responses'>, ExpandBlock<3 | 4 | 5>> extends infer Errors
         ? {
               [Status in keyof Errors]: ClientError<Status extends number ? Status : number, Errors[Status]>
           }[keyof Errors]
         : never
+
+/** Keep only the response entries whose status code matches `Statuses`. */
+type PickStatus<Responses, Statuses> = Pick<Responses, Statuses & keyof Responses>
+
 /**
  * ClientError wraps request and response objects and provide a typed `status` and `body`.
  */

@@ -1,14 +1,5 @@
 import { ClientSpec } from './client'
-import {
-    Default,
-    Deref,
-    ExpandBlock,
-    Get,
-    OptionalUndefined,
-    StatusBlock,
-    StatusDefault,
-    UnionToIntersection,
-} from './util'
+import { Default, Deref, ExpandBlock, Get, StatusBlock, StatusDefault, UnionToIntersection } from './util'
 
 /**
  * Convert OpenAPI Specification type to a `ClientSpec` type.
@@ -22,40 +13,60 @@ export type FromOpenApiSpec<OpenApiSpec, Strict extends boolean = false> = Stric
       ? ResolvedPaths
       : never
 
+/**
+ * Parse the OpenAPI `paths` map into a `ClientSpec` paths map.
+ */
 type ParsePaths<Spec, RawPaths> = {
     [Path in keyof RawPaths]: ParsePath<Spec, RawPaths[Path]>
 }
 
+/**
+ * Parse a path into the `ClientSpec` path shape. `$ref`s are dereferenced to their target path.
+ */
 type ParsePath<Spec, RawPath> =
     Deref<Spec, RawPath> extends infer Raw
         ? { [Method in keyof Raw as Method extends Methods ? Method : never]: ParseMethod<Spec, Raw, Raw[Method]> }
         : never
 
-type ParseMethod<Spec, RawPath, RawMethod> = OptionalUndefined<{
+/**
+ * Parse a method into the `ClientSpec` method shape (parameters, request, responses).
+ */
+type ParseMethod<Spec, RawPath, RawMethod> = {
     path: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'path'>
     header: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'header'>
     cookie: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'cookie'>
     query: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'query' | 'querystring'>
     request: ParseBody<Spec, Get<RawMethod, 'requestBody'>, 'request'>
-}> & {
     responses: ParseResponses<Spec, Get<RawMethod, 'responses'>>
 }
 
+/**
+ * Concatenate path-level and operation-level parameters.
+ */
 type MergedParameters<RawPath, RawMethod> = [
     ...Default<Get<RawPath, 'parameters'>, unknown[], []>,
     ...Default<Get<RawMethod, 'parameters'>, unknown[], []>,
 ]
 
+/**
+ * Parse all parameters of a given type (`path`, `query`, ...) for a given operation into one object.
+ *
+ * No parameters of `In` type result in `{ [_ in string]: never }` to prevent any parameters from being passed.
+ */
 type ParseParameters<Spec, RawParams, In> = RawParams extends unknown[]
     ? UnionToIntersection<ParseParameter<Spec, RawParams[number], In>> extends infer R
         ? unknown extends R
-            ? { [_ in string]: never } | undefined
-            : {} extends R
-              ? R | undefined
-              : R
+            ? { [_ in string]: never }
+            : R
         : never
     : never
 
+/**
+ * Parse one parameter located in `In`. `$ref`s are dereferenced to their target path.
+ *
+ * `explode: true` spreads the schema, otherwise the parameter is keyed by name.
+ * Non-required, non-path parameters become {@linkcode Partial}.
+ */
 type ParseParameter<Spec, RawParam, In> =
     Deref<Spec, RawParam> extends infer Raw
         ? Raw extends { name: infer Name extends string; in: In }
@@ -71,10 +82,20 @@ type ParseParameter<Spec, RawParam, In> =
             : never
         : never
 
+/**
+ * Parse the responses map, re-keying each entry by its resolved status code (see {@linkcode ResolveStatus}).
+ */
 type ParseResponses<Spec, RawResp> = {
     [K in keyof RawResp as ResolveStatus<keyof RawResp, K>]: ParseBody<Spec, RawResp[K], 'response'>
 }
 
+/**
+ * Resolve a response key to a numeric status.
+ *
+ * - Exact codes (`200`, `404`) stay as-is.
+ * - `default` becomes `-1`.
+ * - Wildcards (`2XX`) expand to their block's codes excluding any declared exact codes (exact wins on collision).
+ */
 type ResolveStatus<Statuses, Key> = Key extends `${infer Status extends number}`
     ? Status
     : Key extends 'default'
@@ -85,6 +106,11 @@ type ResolveStatus<Statuses, Key> = Key extends `${infer Status extends number}`
             : never
         : never
 
+/**
+ * Parse the schema from a request or response body's `content`.
+ *
+ * Request bodies that are not `required` are made optional (`| undefined`); response bodies are always taken as-is.
+ */
 type ParseBody<Spec, RawBody, In> =
     Deref<Spec, RawBody> extends infer Raw
         ? (
@@ -98,6 +124,16 @@ type ParseBody<Spec, RawBody, In> =
             : never
         : never
 
+/**
+ * Convert a JSON Schema into its TypeScript type. `$ref`s are dereferenced to their target path.
+ *
+ * This type handles primitives, objects, arrays, null type, `const`/`enum`, `allOf`/`anyOf`/`oneOf`, and boolean
+ * schemas (`true`/`false`). It also handles `nullable` and `type` arrays.
+ *
+ * It covers a mix of OpenAPI 3.0.x, 3.1.x, and 3.2.x, but does not implement the full JSON Schema specification.
+ *
+ * It is optimized to handle most common schema types first, such as `string`, `object`, and `array`.
+ */
 export type ParseSchema<Spec, RawSchema> =
     Deref<Spec, RawSchema> extends infer Raw
         ?
@@ -142,6 +178,10 @@ export type ParseSchema<Spec, RawSchema> =
               | (Raw extends { nullable: true } ? null : never)
         : never
 
+/**
+ * Parse an object schema into a record type: `required` properties stay mandatory, the rest become optional,
+ * and `additionalProperties` adds an index signature.
+ */
 type StrictParseSchemaObject<Spec, Raw> = Raw extends (
     | { type: 'object'; properties?: infer Properties }
     | { type?: never; properties: infer Properties }
@@ -160,6 +200,7 @@ type StrictParseSchemaObject<Spec, Raw> = Raw extends (
       } & (unknown extends Additional ? unknown : { [_: string]: ParseSchema<Spec, Additional> })
     : never
 
+/** Parse an array schema into `Item[]` from its `items` schema. */
 // TODO: implement prefixItems
 type StrictParseSchemaArray<Spec, Raw> = Raw extends { items: infer Item } ? ParseSchema<Spec, Item>[] : never
 

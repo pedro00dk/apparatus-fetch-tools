@@ -16,6 +16,12 @@ export type OptionalUndefined<Object> = {
     [K in keyof Object as undefined extends Object[K] ? K : never]?: Object[K]
 }
 
+export type OptionalEmpty<Object> = {
+    [K in keyof Object as {} extends Object[K] ? never : K]: Object[K]
+} & {
+    [K in keyof Object as {} extends Object[K] ? K : never]?: Object[K]
+}
+
 export type ToNumber<String> = String extends `${infer N extends number}` ? N : never
 
 export type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
