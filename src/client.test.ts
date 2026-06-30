@@ -63,12 +63,12 @@ test('response body parse', async () => {
 
     const api = client({ url })
     expect(typeof (await api['text'].get({})).body).toBe('string')
-    expect((await api['json'].get<Array<undefined>>({})).body).toBeInstanceOf(Array)
-    expect((await api['form'].get<FormData>({})).body).toBeInstanceOf(globalThis.FormData)
-    expect((await api['param'].get<URLSearchParams>({})).body).toBeInstanceOf(URLSearchParams)
-    const blob = (await api['blob'].get<Blob>({})).body
+    expect((await api['json'].get<Array<undefined>>()).body).toBeInstanceOf(Array)
+    expect((await api['form'].get<FormData>()).body).toBeInstanceOf(globalThis.FormData)
+    expect((await api['param'].get<URLSearchParams>()).body).toBeInstanceOf(URLSearchParams)
+    const blob = (await api['blob'].get<Blob>()).body
     expect(blob).toBeInstanceOf(Blob)
-    const jpeg = (await api['jpeg'].get<Blob>({})).body
+    const jpeg = (await api['jpeg'].get<Blob>()).body
     expect(jpeg).toBeInstanceOf(Blob)
     const stream = (await api['jpeg'].get<ReadableStream>({ parse: false })).body
     expect(stream).toBeInstanceOf(ReadableStream)
@@ -96,3 +96,10 @@ test('retry', async () => {
     run = 0
     await expect(api[''].get({ retry: 2 })).resolves.toBeDefined()
 })
+
+test('types (tsc --noEmit)', () => {
+    const tsc = Bun.spawnSync(['node_modules/.bin/tsc', '--noEmit'], { stdout: 'pipe', stderr: 'pipe' })
+    const output = (tsc.stdout.toString() + tsc.stderr.toString()).trim()
+    if (tsc.exitCode !== 0) console.error(output)
+    expect(tsc.exitCode).toBe(0)
+}, 60_000)
