@@ -10,7 +10,7 @@ export const client = <Spec = DefaultSpec, Bypass = true>(defaults: ClientReques
     const proxyObject = (path?: string, method?: string) => Object.assign(() => {}, { path, method, children: {} })
 
     const proxyHandler: ProxyHandler<ProxyObject> = {
-        apply: (target, _, [request]: [ClientRequest]) => call(target.path!, target.method!, defaults, request),
+        apply: (target, _, [request = {}]: [ClientRequest?]) => call(target.path!, target.method!, defaults, request),
         get: (target, pathOrMethod, receiver) => {
             if (typeof pathOrMethod !== 'string' || pathOrMethod === '$') return receiver
             const path = target.path ?? pathOrMethod

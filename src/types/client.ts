@@ -64,7 +64,9 @@ export type Client<Spec, Bypass = true> = {
                 RequestOverride
             >,
         >(
-            request: Request,
+            ...request: {} extends ClientRequest<Spec[Path][Method], RequestOverride>
+                ? [request?: Request]
+                : [request: Request]
         ) => Promise<ClientResponse<Spec[Path][Method], ResponseOverride, Request>>) & {
             error: ClientError_<Spec[Path][Method]>
         }
