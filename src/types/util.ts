@@ -19,5 +19,11 @@ export type OptionalUndefined<Object> = {
 export type ToNumber<String> = String extends `${infer N extends number}` ? N : never
 
 export type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-export type HttpGroup = 1 | 2 | 3 | 4 | 5
-export type ShortStatus<T> = T extends HttpGroup ? ToNumber<`${T}${Digit}${Digit}`> : T
+export type StatusBlock = 1 | 2 | 3 | 4 | 5
+export type StatusDefault = -1
+
+/** Leading block digit of a 3-digit HTTP status code, e.g. `404` -> `4`. */
+export type BlockOf<N> = `${N & number}` extends `${infer D extends StatusBlock}${Digit}${Digit}` ? D : never
+
+/** Expand a block digit into its 100 literal status codes, e.g. `2` -> `200 | 201 | ... | 299`. */
+export type ExpandBlock<D> = D extends StatusBlock ? ToNumber<`${D}${Digit}${Digit}`> : never

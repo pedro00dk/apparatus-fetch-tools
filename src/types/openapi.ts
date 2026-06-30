@@ -1,5 +1,14 @@
 import { ClientSpec } from './client'
-import { Default, Deref, Get, OptionalUndefined, ToNumber, UnionToIntersection } from './util'
+import {
+    Default,
+    Deref,
+    ExpandBlock,
+    Get,
+    OptionalUndefined,
+    StatusBlock,
+    StatusDefault,
+    UnionToIntersection,
+} from './util'
 
 /**
  * Convert OpenAPI Specification type to a `ClientSpec` type.
@@ -30,7 +39,6 @@ type ParseMethod<Spec, RawPath, RawMethod> = OptionalUndefined<{
     request: ParseBody<Spec, Get<RawMethod, 'requestBody'>, 'request'>
 }> & {
     responses: ParseResponses<Spec, Get<RawMethod, 'responses'>>
-    fallback: NonNullable<ParseBody<Spec, Get<Get<RawMethod, 'responses'>, 'default', unknown>, 'response'>>
 }
 
 type MergedParameters<RawPath, RawMethod> = [
@@ -64,14 +72,18 @@ type ParseParameter<Spec, RawParam, In> =
         : never
 
 type ParseResponses<Spec, RawResp> = {
-    [K in keyof RawResp as ResponseStatusToNumber<K>]: ParseBody<Spec, RawResp[K], 'response'>
+    [K in keyof RawResp as ResolveStatus<keyof RawResp, K>]: ParseBody<Spec, RawResp[K], 'response'>
 }
 
-type ResponseStatusToNumber<Key> = Key extends `${infer Status extends number}`
+type ResolveStatus<Statuses, Key> = Key extends `${infer Status extends number}`
     ? Status
-    : Key extends `${infer Status extends 1 | 2 | 3 | 4 | 5}XX`
-      ? ToNumber<`${Status}${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`>
-      : never
+    : Key extends 'default'
+      ? StatusDefault
+      : Key extends `${infer Status extends StatusBlock}XX`
+        ? Exclude<`${ExpandBlock<Status>}`, Statuses> extends `${infer Status extends number}`
+            ? Status
+            : never
+        : never
 
 type ParseBody<Spec, RawBody, In> =
     Deref<Spec, RawBody> extends infer Raw
