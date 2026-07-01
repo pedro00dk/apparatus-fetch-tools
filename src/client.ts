@@ -121,7 +121,8 @@ export const call = async (
         async ($, { interceptResponse }) => (await interceptResponse?.(await $)) ?? $,
         Promise.resolve(response),
     )
-    return { request, response, status: response.status, body: responseBody }
+
+    return { request, response, status: response.status, body: responseBody } as ClientResponse
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Default, ExpandBlock, Get, OptionalEmpty, OptionalUndefined, StatusBlock, StatusDefault } from './util'
+import { ExpandBlock, Get, OptionalEmpty, OptionalUndefined, StatusBlock, StatusDefault } from './util'
 
 /**
  * Base API specification type used to create typed {@linkcode Client}s.
@@ -59,7 +59,7 @@ export type Client<Spec, Bypass = true> = {
         [Method in keyof Spec[Path]]: (<
             ResponseOverride = unknown,
             RequestOverride = unknown,
-            Request extends ClientRequest<Spec[Path][Method], RequestOverride> = OmittedRequest<
+            Request extends ClientRequest<Spec[Path][Method], RequestOverride> = ClientRequest<
                 Spec[Path][Method],
                 RequestOverride
             >,
@@ -190,18 +190,6 @@ export type ClientRequest<
     }>
 
 /**
- * The {@linkcode ClientRequest} used as the default when the request argument is omitted from a call.
- *
- * An omitted argument makes TypeScript resolve `Request` to this default rather than to `undefined`, so it
- * cannot be detected downstream. Erasing `status` (`& { status?: never }`) makes {@linkcode ClientResponse}
- * see "no status" and fall back to its default `[2]`, instead of the wide declared `status` union. The
- * intersection is always assignable to `ClientRequest`, so it satisfies the type parameter constraint.
- */
-export type OmittedRequest<MethodSpec, BodyOverride> = ClientRequest<MethodSpec, BodyOverride> & {
-    status?: never
-}
-
-/**
  * ClientResponse wraps request and response objects and provide a typed `status` and `body`.
  *
  * The `status` field of the request narrows the resulting union. Each requested code is resolved
@@ -212,8 +200,18 @@ export type ClientResponse<
     BodyOverride = unknown,
     Request = ClientRequest<MethodSpec, unknown>,
 > = unknown extends BodyOverride
-    ? ResolveStatuses<Get<MethodSpec, 'responses'>, Default<Get<Request, 'status'>, number[], [2]>[number], Request>
+    ? ResolveStatuses<Get<MethodSpec, 'responses'>, RequestStatus<Request>[number], Request>
     : ResponseEntry<number, BodyOverride, Request>
+
+/**
+ * The requested status codes, defaulting to `[2]` when none were explicitly provided.
+ *
+ * The check is intentionally non-distributive (`[S] extends [number[]]`): an omitted request argument makes
+ * `Request` resolve to the default `ClientRequest`, whose optional `status?` reads back as `(...)[] | undefined`.
+ * A distributive check would split that union and keep the `(...)[]` half (the wide status bug); as a whole it
+ * is not a clean `number[]`, so it correctly falls back to `[2]`.
+ */
+type RequestStatus<Request> = [Get<Request, 'status'>] extends [number[]] ? Get<Request, 'status'> : [2]
 
 /**
  * Resolve the requested status codes into a union of {@linkcode ResponseEntry}.
