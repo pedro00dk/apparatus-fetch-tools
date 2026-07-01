@@ -59,7 +59,7 @@ export type Client<Spec, Bypass = true> = {
         [Method in keyof Spec[Path]]: (<
             ResponseOverride = unknown,
             RequestOverride = unknown,
-            Request extends ClientRequest<Spec[Path][Method], RequestOverride> = ClientRequest<
+            Request extends ClientRequest<Spec[Path][Method], RequestOverride> = OmittedRequest<
                 Spec[Path][Method],
                 RequestOverride
             >,
@@ -188,6 +188,18 @@ export type ClientRequest<
          */
         body: unknown extends BodyOverride ? Get<MethodSpec, 'request'> : BodyOverride
     }>
+
+/**
+ * The {@linkcode ClientRequest} used as the default when the request argument is omitted from a call.
+ *
+ * An omitted argument makes TypeScript resolve `Request` to this default rather than to `undefined`, so it
+ * cannot be detected downstream. Erasing `status` (`& { status?: never }`) makes {@linkcode ClientResponse}
+ * see "no status" and fall back to its default `[2]`, instead of the wide declared `status` union. The
+ * intersection is always assignable to `ClientRequest`, so it satisfies the type parameter constraint.
+ */
+export type OmittedRequest<MethodSpec, BodyOverride> = ClientRequest<MethodSpec, BodyOverride> & {
+    status?: never
+}
 
 /**
  * ClientResponse wraps request and response objects and provide a typed `status` and `body`.

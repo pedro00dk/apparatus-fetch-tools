@@ -100,5 +100,24 @@ function narrowing(r: Res<[200, 404]>) {
     if (r.status === 200) expect<Equal<typeof r.body, 'ok'>>()
 }
 
+// ---------------------------------------------------------------------------
+// Default `status` when the request argument is omitted
+// ---------------------------------------------------------------------------
+
+// Omitting the request argument must behave like passing an empty object: `status` defaults to `[2]`,
+// NOT the wide declared `status` type. Both resolve to just the 200 response.
+async function defaultStatus() {
+    const omitted = await api['/x'].get()
+    const empty = await api['/x'].get({})
+    expect<Equal<typeof omitted.status, 200>>()
+    expect<Equal<typeof omitted.body, 'ok'>>()
+    expect<Equal<typeof empty.status, 200>>()
+    expect<Equal<typeof empty.body, 'ok'>>()
+
+    // An explicit `status` is still honored.
+    const explicit = await api['/x'].get({ status: [200, 400] })
+    expect<Equal<typeof explicit.status, 200 | 400>>()
+}
+
 // Reference values so nothing is flagged as unused.
-export const _typeTest = { api, narrowing }
+export const _typeTest = { api, narrowing, defaultStatus }
