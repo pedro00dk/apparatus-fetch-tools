@@ -102,4 +102,4 @@ test('types (tsc --noEmit)', () => {
     const output = (tsc.stdout.toString() + tsc.stderr.toString()).trim()
     if (tsc.exitCode !== 0) console.error(output)
     expect(tsc.exitCode).toBe(0)
-}, 60_000)
+})
