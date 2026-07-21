@@ -6,11 +6,11 @@ import { ExpandBlock, Get, OptionalEmpty, OptionalUndefined, StatusBlock, Status
 export type ClientSpec<Methods extends string = string> = {
     [Path in string]: {
         [Method in Methods]?: {
-            path: { [_ in string]: unknown }
-            query: { [_ in string]: unknown }
-            header: { [_ in string]: string }
-            cookie: { [_ in string]: string }
-            request: BodyInit | object | string | number | bigint | boolean | null | undefined
+            path?: { [_ in string]: unknown }
+            query?: { [_ in string]: unknown }
+            header?: { [_ in string]: string }
+            cookie?: { [_ in string]: string }
+            request?: BodyInit | object | string | number | bigint | boolean | null | undefined
             responses: { [_ in number]: unknown }
         }
     }
@@ -22,11 +22,11 @@ export type ClientSpec<Methods extends string = string> = {
 export type DefaultSpec<Methods extends string = DefaultMethod> = {
     [Path in string]: {
         [Method in Methods]: {
-            path: { [_ in string]: unknown }
-            query: { [_ in string]: unknown }
-            header: { [_ in string]: string }
-            cookie: { [_ in string]: string }
-            request: BodyInit | object | string | number | bigint | boolean | null | undefined
+            path?: { [_ in string]: unknown }
+            query?: { [_ in string]: unknown }
+            header?: { [_ in string]: string }
+            cookie?: { [_ in string]: string }
+            request?: BodyInit | object | string | number | bigint | boolean | null | undefined
             responses: { [_ in number]: unknown }
         }
     }
@@ -53,6 +53,14 @@ export type DefaultMethod =
  * An untyped {@linkcode DefaultClient} is available through `$` if `Bypass` is `true`, useful for dynamic requests.
  */
 export type Client<Spec, Bypass = true> = {
+    /**
+     * A phantom field to carry the spec type, useful for narrowing and type inference.
+     */
+    $spec: Spec
+
+    /**
+     * An untyped client that bypasses the spec, useful for dynamic requests.
+     */
     $: Bypass extends true ? Client<DefaultSpec, false> : never
 } & {
     [Path in keyof Spec]: {
@@ -169,20 +177,21 @@ export type ClientRequest<
         path: Get<MethodSpec, 'path'>
 
         /**
-         * Query parameters appended to any existing parameters specified in `url`.
-         */
-        query: Get<MethodSpec, 'query'>
-    }> & {
-        /**
          * Stricter version of {@linkcode RequestInit} `headers` for simpler merging.
          */
-        header?: Partial<Get<MethodSpec, 'header'>>
+        header: Get<MethodSpec, 'header'>
 
         /**
          * Cookies to be included in the request.
          */
-        cookie?: Partial<Get<MethodSpec, 'cookie'>>
-    } & OptionalUndefined<{
+        cookie: Get<MethodSpec, 'cookie'>
+
+        /**
+         * Query parameters appended to any existing parameters specified in `url`.
+         */
+        query: Get<MethodSpec, 'query'>
+    }> &
+    OptionalUndefined<{
         /**
          * Request body.
          */

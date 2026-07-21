@@ -1,5 +1,15 @@
 import { ClientSpec } from './client'
-import { Default, Deref, ExpandBlock, Get, StatusBlock, StatusDefault, UnionToIntersection } from './util'
+import {
+    Default,
+    Deref,
+    ExpandBlock,
+    Get,
+    OptionalEmpty,
+    OptionalUndefined,
+    StatusBlock,
+    StatusDefault,
+    UnionToIntersection,
+} from './util'
 
 /**
  * Convert OpenAPI Specification type to a `ClientSpec` type.
@@ -31,14 +41,15 @@ type ParsePath<Spec, RawPath> =
 /**
  * Parse a method into the `ClientSpec` method shape (parameters, request, responses).
  */
-type ParseMethod<Spec, RawPath, RawMethod> = {
+type ParseMethod<Spec, RawPath, RawMethod> = OptionalEmpty<{
     path: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'path'>
-    header: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'header'>
-    cookie: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'cookie'>
+    header: Partial<ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'header'>>
+    cookie: Partial<ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'cookie'>>
     query: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'query' | 'querystring'>
-    request: ParseBody<Spec, Get<RawMethod, 'requestBody'>, 'request'>
-    responses: ParseResponses<Spec, Get<RawMethod, 'responses'>>
-}
+}> &
+    OptionalUndefined<{ request: ParseBody<Spec, Get<RawMethod, 'requestBody'>, 'request'> }> & {
+        responses: ParseResponses<Spec, Get<RawMethod, 'responses'>>
+    }
 
 /**
  * Concatenate path-level and operation-level parameters.
