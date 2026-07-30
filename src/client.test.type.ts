@@ -1,5 +1,5 @@
 /**
- * Compile-time tests for response status-code resolution.
+ * Compile-time tests for response status-code resolution and schema parsing.
  *
  * This file is checked by `tsc` (run `bun run build` or `npx tsc --noEmit`). It executes nothing —
  * a wrong type produces a compile error. Each `expect<...>()` line documents one behavior; flip a
@@ -7,7 +7,7 @@
  */
 import { client } from './client'
 import { ClientResponse } from './types/client'
-import { FromOpenApiSpec } from './types/openapi'
+import { FromOpenApiSpec, ParserOptions, ParseSchema } from './types/openapi'
 import { ExpandBlock } from './types/util'
 
 /** True only when `A` and `B` are mutually assignable (exact equality). */
@@ -24,12 +24,24 @@ type Spec = FromOpenApiSpec<{
         '/x': {
             get: {
                 responses: {
-                    '200': { content: { 'application/json': { schema: { const: 'ok' } } } }
-                    '3XX': { content: { 'application/json': { schema: { const: 'other3xx' } } } }
-                    '400': { content: { 'application/json': { schema: { const: 'bad' } } } }
-                    '404': { content: { 'application/json': { schema: { const: 'notfound' } } } }
-                    '4XX': { content: { 'application/json': { schema: { const: 'other4xx' } } } }
-                    default: { content: { 'application/json': { schema: { const: 'fallback' } } } }
+                    '200': {
+                        content: { 'application/json': { schema: { const: 'ok' } } }
+                    }
+                    '3XX': {
+                        content: { 'application/json': { schema: { const: 'other3xx' } } }
+                    }
+                    '400': {
+                        content: { 'application/json': { schema: { const: 'bad' } } }
+                    }
+                    '404': {
+                        content: { 'application/json': { schema: { const: 'notfound' } } }
+                    }
+                    '4XX': {
+                        content: { 'application/json': { schema: { const: 'other4xx' } } }
+                    }
+                    default: {
+                        content: { 'application/json': { schema: { const: 'fallback' } } }
+                    }
                 }
             }
         }
@@ -69,7 +81,9 @@ expect<Equal<Res<[503]>['status'], 503>>()
 expect<Equal<Res<[503]>['body'], 'fallback'>>()
 
 // An exact code with neither a response nor a fallback resolves to `unknown`.
-type NoFallback = Omit<Spec['/x']['get'], 'responses'> & { responses: Omit<Responses, -1> }
+type NoFallback = Omit<Spec['/x']['get'], 'responses'> & {
+    responses: Omit<Responses, -1>
+}
 expect<Equal<ClientResponse<NoFallback, unknown, { status: [503] }>['body'], unknown>>()
 
 // A block request expands to the literal codes of that block present in the spec (here 400..499),
@@ -118,6 +132,288 @@ async function defaultStatus() {
     const explicit = await api['/x'].get({ status: [200, 400] })
     expect<Equal<typeof explicit.status, 200 | 400>>()
 }
+
+// ---------------------------------------------------------------------------
+// ParseSchema
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively collapse intersections of mapped types into plain objects.
+ *
+ * `ParseSchema` builds object types as intersections (required & optional & additional), which are
+ * structurally right but not *identical* to a flat object literal, so `Equal` would reject them.
+ */
+type Flat<T> = T extends object ? { [K in keyof T]: Flat<T[K]> } : T
+
+/** A spec holding reusable component schemas, to exercise `$ref` resolution. */
+type Schemas = {
+    components: {
+        schemas: {
+            Str: { type: 'string' }
+            Point: {
+                type: 'object'
+                properties: { x: { type: 'number' }; y: { type: 'number' } }
+                required: ['x', 'y']
+            }
+            RefToStr: { $ref: '#/components/schemas/Str' }
+        }
+    }
+}
+
+/** Parse a schema against {@linkcode Schemas}, defaulting to no parser options. */
+type Parse<RawSchema, Options extends ParserOptions = {}> = Flat<ParseSchema<Schemas, RawSchema, Options>>
+
+// Object schemas reused across the union/intersection cases below.
+type ObjA = {
+    type: 'object'
+    properties: { a: { type: 'string' } }
+    required: ['a']
+}
+type ObjB = {
+    type: 'object'
+    properties: { b: { type: 'number' } }
+    required: ['b']
+}
+
+// --- primitives ---
+expect<Equal<Parse<{ type: 'string' }>, string>>()
+expect<Equal<Parse<{ type: 'number' }>, number>>()
+expect<Equal<Parse<{ type: 'integer' }>, number>>()
+expect<Equal<Parse<{ type: 'boolean' }>, boolean>>()
+expect<Equal<Parse<{ type: 'null' }>, null>>()
+// `format` is ignored.
+expect<Equal<Parse<{ type: 'string'; format: 'date-time' }>, string>>()
+
+// --- boolean schemas ---
+expect<Equal<Parse<true>, unknown>>()
+expect<Equal<Parse<false>, never>>()
+
+// --- `type` arrays (3.1) and `nullable` (3.0) ---
+expect<Equal<Parse<{ type: ['string', 'number'] }>, string | number>>()
+expect<Equal<Parse<{ type: ['string', 'null'] }>, string | null>>()
+expect<Equal<Parse<{ type: ['string', 'number', 'boolean'] }>, string | number | boolean>>()
+expect<Equal<Parse<{ type: 'string'; nullable: true }>, string | null>>()
+expect<Equal<Parse<ObjA & { nullable: true }>, { a: string } | null>>()
+// `nullable: false` adds nothing.
+expect<Equal<Parse<{ type: 'string'; nullable: false }>, string>>()
+
+// --- `enum` / `const`, which win over a declared `type` ---
+expect<Equal<Parse<{ enum: ['a', 'b'] }>, 'a' | 'b'>>()
+expect<Equal<Parse<{ enum: ['a', 1, null] }>, 'a' | 1 | null>>()
+expect<Equal<Parse<{ const: 'ok' }>, 'ok'>>()
+expect<Equal<Parse<{ type: 'string'; enum: ['a', 'b'] }>, 'a' | 'b'>>()
+expect<Equal<Parse<{ type: 'string'; const: 'a' }>, 'a'>>()
+
+// --- objects ---
+expect<Equal<Parse<ObjA>, { a: string }>>()
+// Only names listed in `required` stay mandatory.
+expect<
+    Equal<
+        Parse<{
+            type: 'object'
+            properties: { a: { type: 'string' }; b: { type: 'number' } }
+            required: ['a']
+        }>,
+        { a: string; b?: number }
+    >
+>()
+// No `required` at all makes every property optional.
+expect<Equal<Parse<{ type: 'object'; properties: { a: { type: 'string' } } }>, { a?: string }>>()
+// An object with no `properties` is an empty object.
+expect<Equal<Parse<{ type: 'object' }>, {}>>()
+// `additionalProperties` adds an index signature; `true` widens it to `unknown`.
+expect<
+    Equal<
+        Parse<{
+            type: 'object'
+            properties: { a: { type: 'string' } }
+            required: ['a']
+            additionalProperties: { type: 'string' }
+        }>,
+        { [_: string]: string; a: string }
+    >
+>()
+expect<Equal<Parse<{ type: 'object'; additionalProperties: true }>, { [_: string]: unknown }>>()
+// A schema with `properties` but no `type` is still parsed as an object.
+expect<Equal<Parse<{ properties: { a: { type: 'string' } }; required: ['a'] }>, { a: string }>>()
+
+// --- arrays ---
+expect<Equal<Parse<{ type: 'array'; items: { type: 'string' } }>, string[]>>()
+expect<Equal<Parse<{ type: 'array'; items: ObjA }>, { a: string }[]>>()
+expect<
+    Equal<
+        Parse<{
+            type: 'array'
+            items: { type: 'array'; items: { type: 'number' } }
+        }>,
+        number[][]
+    >
+>()
+// An array schema with neither `items` nor `prefixItems` has no item type to build from.
+expect<Equal<Parse<{ type: 'array' }>, never>>()
+
+// --- `prefixItems` tuples ---
+// `items: false` closes the tuple.
+expect<
+    Equal<
+        Parse<{
+            type: 'array'
+            prefixItems: [{ type: 'string' }, { type: 'number' }]
+            items: false
+        }>,
+        [string, number]
+    >
+>()
+// An absent `items` leaves it open, since extra items are unconstrained.
+expect<Equal<Parse<{ type: 'array'; prefixItems: [{ type: 'string' }] }>, [string, ...unknown[]]>>()
+// `items: true` is the same as absent.
+expect<Equal<Parse<{ type: 'array'; prefixItems: [{ type: 'string' }]; items: true }>, [string, ...unknown[]]>>()
+// A schema for `items` types everything past the prefix.
+expect<
+    Equal<
+        Parse<{
+            type: 'array'
+            prefixItems: [{ type: 'string' }]
+            items: { type: 'boolean' }
+        }>,
+        [string, ...boolean[]]
+    >
+>()
+expect<Equal<Parse<{ type: 'array'; prefixItems: []; items: false }>, []>>()
+// Tuples nest, and compose with plain arrays.
+expect<
+    Equal<
+        Parse<{
+            type: 'array'
+            items: {
+                type: 'array'
+                prefixItems: [{ type: 'string' }, ObjA]
+                items: false
+            }
+        }>,
+        [string, { a: string }][]
+    >
+>()
+
+// --- `allOf` intersects ---
+expect<Equal<Parse<{ allOf: [ObjA, ObjB] }>, { a: string; b: number }>>()
+expect<Equal<Parse<{ allOf: [ObjA] }>, { a: string }>>()
+
+// --- `anyOf` / `oneOf` default to unions ---
+expect<Equal<Parse<{ anyOf: [{ type: 'string' }, { type: 'number' }] }>, string | number>>()
+expect<
+    Equal<
+        Parse<{
+            oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }]
+        }>,
+        string | number | boolean
+    >
+>()
+expect<Equal<Parse<{ oneOf: [{ type: 'string' }] }>, string>>()
+expect<Equal<Parse<{ anyOf: [ObjA, ObjB] }>, { a: string } | { b: number }>>()
+// A single member must not collapse to `unknown` — the recursion's empty-tail base case would
+// otherwise absorb the whole union.
+expect<Equal<Parse<{ anyOf: [ObjA] }>, { a: string }>>()
+
+// --- vacuous compositions accept anything, under either mode ---
+expect<Equal<Parse<{ allOf: [] }>, unknown>>()
+expect<Equal<Parse<{ anyOf: [] }>, unknown>>()
+expect<Equal<Parse<{ oneOf: [] }>, unknown>>()
+expect<Equal<Parse<{ anyOf: [] }, { anyOfIntersection: true }>, unknown>>()
+expect<Equal<Parse<{ oneOf: [] }, { oneOfIntersection: true }>, unknown>>()
+
+// --- the intersection options make every member `Partial` instead ---
+expect<Equal<Parse<{ anyOf: [ObjA, ObjB] }, { anyOfIntersection: true }>, { a?: string; b?: number }>>()
+expect<Equal<Parse<{ oneOf: [ObjA, ObjB] }, { oneOfIntersection: true }>, { a?: string; b?: number }>>()
+// Each option only affects its own keyword.
+expect<Equal<Parse<{ oneOf: [ObjA, ObjB] }, { anyOfIntersection: true }>, { a: string } | { b: number }>>()
+expect<Equal<Parse<{ anyOf: [ObjA, ObjB] }, { oneOfIntersection: true }>, { a: string } | { b: number }>>()
+
+// --- composition precedence ---
+// `anyOf`/`oneOf`/`allOf` win over a sibling `type`, which is dropped.
+expect<Equal<Parse<{ type: 'string'; anyOf: [{ type: 'number' }, { type: 'boolean' }] }>, number | boolean>>()
+// `allOf` is checked before `anyOf`, so only `allOf` applies when both are present.
+expect<Equal<Parse<{ allOf: [ObjA]; anyOf: [ObjB] }>, { a: string }>>()
+
+// --- `$ref` resolution ---
+expect<Equal<Parse<{ $ref: '#/components/schemas/Str' }>, string>>()
+expect<Equal<Parse<{ $ref: '#/components/schemas/Point' }>, { x: number; y: number }>>()
+// A `$ref` resolves wherever a schema is accepted.
+expect<Equal<Parse<{ type: 'array'; items: { $ref: '#/components/schemas/Point' } }>, { x: number; y: number }[]>>()
+expect<
+    Equal<
+        Parse<{
+            type: 'object'
+            properties: { p: { $ref: '#/components/schemas/Point' } }
+            required: ['p']
+        }>,
+        { p: { x: number; y: number } }
+    >
+>()
+expect<
+    Equal<
+        Parse<{
+            oneOf: [{ $ref: '#/components/schemas/Str' }, { type: 'number' }]
+        }>,
+        string | number
+    >
+>()
+expect<
+    Equal<
+        Parse<{
+            type: 'array'
+            prefixItems: [{ $ref: '#/components/schemas/Str' }]
+            items: false
+        }>,
+        [string]
+    >
+>()
+// A pointer at nothing resolves to `undefined`, which no schema branch matches, so it lands on `never`
+// rather than failing to compile.
+expect<Equal<Parse<{ $ref: '#/components/schemas/Missing' }>, never>>()
+
+// --- options thread all the way down a nested schema ---
+type Nested = {
+    type: 'object'
+    properties: { list: { type: 'array'; items: { oneOf: [ObjA, ObjB] } } }
+    required: ['list']
+}
+expect<Equal<Parse<Nested>, { list: ({ a: string } | { b: number })[] }>>()
+expect<Equal<Parse<Nested, { oneOfIntersection: true }>, { list: { a?: string; b?: number }[] }>>()
+
+// --- and options reach schemas through `FromOpenApiSpec` ---
+type OneOfSpec<Options extends ParserOptions> = FromOpenApiSpec<
+    {
+        openapi: '3.1.0'
+        paths: {
+            '/y': {
+                post: {
+                    requestBody: {
+                        required: true
+                        content: {
+                            'application/json': { schema: { oneOf: [ObjA, ObjB] } }
+                        }
+                    }
+                    responses: {
+                        '200': {
+                            content: {
+                                'application/json': { schema: { oneOf: [ObjA, ObjB] } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    Options
+>
+
+expect<Equal<Flat<OneOfSpec<{}>['/y']['post']['responses'][200]>, { a: string } | { b: number }>>()
+expect<Equal<Flat<OneOfSpec<{}>['/y']['post']['request']>, { a: string } | { b: number }>>()
+expect<
+    Equal<Flat<OneOfSpec<{ oneOfIntersection: true }>['/y']['post']['responses'][200]>, { a?: string; b?: number }>
+>()
+expect<Equal<Flat<OneOfSpec<{ oneOfIntersection: true }>['/y']['post']['request']>, { a?: string; b?: number }>>()
 
 // Reference values so nothing is flagged as unused.
 export const _typeTest = { api, narrowing, defaultStatus }

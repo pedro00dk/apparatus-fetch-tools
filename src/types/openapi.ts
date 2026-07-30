@@ -17,38 +17,56 @@ import {
  * @param OpenApiSpec The OpenAPI Specification type to convert.
  * @param Strict Ensure the result matches ClientSpec. More precise but impacts performance, use for checking only.
  */
-export type FromOpenApiSpec<OpenApiSpec, Strict extends boolean = false> = Strict extends false
-    ? ParsePaths<OpenApiSpec, Get<OpenApiSpec, 'paths'>>
-    : ParsePaths<OpenApiSpec, Get<OpenApiSpec, 'paths'>> extends infer ResolvedPaths extends ClientSpec
+export type FromOpenApiSpec<
+    OpenApiSpec,
+    Options extends ParserOptions = {},
+    Strict extends boolean = false,
+> = Strict extends false
+    ? ParsePaths<OpenApiSpec, Get<OpenApiSpec, 'paths'>, Options>
+    : ParsePaths<OpenApiSpec, Get<OpenApiSpec, 'paths'>, Options> extends infer ResolvedPaths extends ClientSpec
       ? ResolvedPaths
       : never
+
+export type ParserOptions = {
+    anyOfIntersection?: boolean
+    oneOfIntersection?: boolean
+}
 
 /**
  * Parse the OpenAPI `paths` map into a `ClientSpec` paths map.
  */
-type ParsePaths<Spec, RawPaths> = {
-    [Path in keyof RawPaths]: ParsePath<Spec, RawPaths[Path]>
+type ParsePaths<Spec, RawPaths, Options extends ParserOptions> = {
+    [Path in keyof RawPaths]: ParsePath<Spec, RawPaths[Path], Options>
 }
 
 /**
  * Parse a path into the `ClientSpec` path shape. `$ref`s are dereferenced to their target path.
  */
-type ParsePath<Spec, RawPath> =
+type ParsePath<Spec, RawPath, Options extends ParserOptions> =
     Deref<Spec, RawPath> extends infer Raw
-        ? { [Method in keyof Raw as Method extends Methods ? Method : never]: ParseMethod<Spec, Raw, Raw[Method]> }
+        ? {
+              [Method in keyof Raw as Method extends Methods ? Method : never]: ParseMethod<
+                  Spec,
+                  Raw,
+                  Raw[Method],
+                  Options
+              >
+          }
         : never
 
 /**
  * Parse a method into the `ClientSpec` method shape (parameters, request, responses).
  */
-type ParseMethod<Spec, RawPath, RawMethod> = OptionalEmpty<{
-    path: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'path'>
-    header: Partial<ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'header'>>
-    cookie: Partial<ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'cookie'>>
-    query: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'query' | 'querystring'>
+type ParseMethod<Spec, RawPath, RawMethod, Options extends ParserOptions> = OptionalEmpty<{
+    path: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'path', Options>
+    header: Partial<ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'header', Options>>
+    cookie: Partial<ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'cookie', Options>>
+    query: ParseParameters<Spec, MergedParameters<RawPath, RawMethod>, 'query' | 'querystring', Options>
 }> &
-    OptionalUndefined<{ request: ParseBody<Spec, Get<RawMethod, 'requestBody'>, 'request'> }> & {
-        responses: ParseResponses<Spec, Get<RawMethod, 'responses'>>
+    OptionalUndefined<{
+        request: ParseBody<Spec, Get<RawMethod, 'requestBody'>, 'request', Options>
+    }> & {
+        responses: ParseResponses<Spec, Get<RawMethod, 'responses'>, Options>
     }
 
 /**
@@ -64,8 +82,8 @@ type MergedParameters<RawPath, RawMethod> = [
  *
  * No parameters of `In` type result in `{ [_ in string]: never }` to prevent any parameters from being passed.
  */
-type ParseParameters<Spec, RawParams, In> = RawParams extends unknown[]
-    ? UnionToIntersection<ParseParameter<Spec, RawParams[number], In>> extends infer R
+type ParseParameters<Spec, RawParams, In, Options extends ParserOptions> = RawParams extends unknown[]
+    ? UnionToIntersection<ParseParameter<Spec, RawParams[number], In, Options>> extends infer R
         ? unknown extends R
             ? { [_ in string]: never }
             : R
@@ -78,13 +96,13 @@ type ParseParameters<Spec, RawParams, In> = RawParams extends unknown[]
  * `explode: true` spreads the schema, otherwise the parameter is keyed by name.
  * Non-required, non-path parameters become {@linkcode Partial}.
  */
-type ParseParameter<Spec, RawParam, In> =
+type ParseParameter<Spec, RawParam, In, Options extends ParserOptions> =
     Deref<Spec, RawParam> extends infer Raw
         ? Raw extends { name: infer Name extends string; in: In }
             ? (
                   Raw extends { explode: true }
-                      ? ParseSchema<Spec, Get<Raw, 'schema'>>
-                      : { [K in Name]: ParseSchema<Spec, Get<Raw, 'schema'>> }
+                      ? ParseSchema<Spec, Get<Raw, 'schema'>, Options>
+                      : { [K in Name]: ParseSchema<Spec, Get<Raw, 'schema'>, Options> }
               ) extends infer Param
                 ? Raw extends { required: true } | { in: 'path' }
                     ? Param
@@ -96,8 +114,8 @@ type ParseParameter<Spec, RawParam, In> =
 /**
  * Parse the responses map, re-keying each entry by its resolved status code (see {@linkcode ResolveStatus}).
  */
-type ParseResponses<Spec, RawResp> = {
-    [K in keyof RawResp as ResolveStatus<keyof RawResp, K>]: ParseBody<Spec, RawResp[K], 'response'>
+type ParseResponses<Spec, RawResp, Options extends ParserOptions> = {
+    [K in keyof RawResp as ResolveStatus<keyof RawResp, K>]: ParseBody<Spec, RawResp[K], 'response', Options>
 }
 
 /**
@@ -122,10 +140,12 @@ type ResolveStatus<Statuses, Key> = Key extends `${infer Status extends number}`
  *
  * Request bodies that are not `required` are made optional (`| undefined`); response bodies are always taken as-is.
  */
-type ParseBody<Spec, RawBody, In> =
+type ParseBody<Spec, RawBody, In, Options extends ParserOptions> =
     Deref<Spec, RawBody> extends infer Raw
         ? (
-              Raw extends { content: { [_ in string]: { schema: infer Body } } } ? ParseSchema<Spec, Body> : undefined
+              Raw extends { content: { [_ in string]: { schema: infer Body } } }
+                  ? ParseSchema<Spec, Body, Options>
+                  : undefined
           ) extends infer Schema
             ? In extends 'response'
                 ? Schema
@@ -145,7 +165,7 @@ type ParseBody<Spec, RawBody, In> =
  *
  * It is optimized to handle most common schema types first, such as `string`, `object`, and `array`.
  */
-export type ParseSchema<Spec, RawSchema> =
+export type ParseSchema<Spec, RawSchema, Options extends ParserOptions> =
     Deref<Spec, RawSchema> extends infer Raw
         ?
               | (Raw extends {
@@ -159,9 +179,9 @@ export type ParseSchema<Spec, RawSchema> =
                     ? Type extends 'string'
                         ? string
                         : Type extends 'object'
-                          ? StrictParseSchemaObject<Spec, Raw>
+                          ? StrictParseSchemaObject<Spec, Raw, Options>
                           : Type extends 'array'
-                            ? StrictParseSchemaArray<Spec, Raw>
+                            ? StrictParseSchemaArray<Spec, Raw, Options>
                             : Type extends 'number' | 'integer'
                               ? number
                               : Type extends 'boolean'
@@ -169,7 +189,7 @@ export type ParseSchema<Spec, RawSchema> =
                                 : Type extends 'null'
                                   ? null
                                   : Type extends [infer Head, ...infer Tail]
-                                    ? ParseSchema<Spec, { type: Head | Tail } & Omit<Raw, 'type'>>
+                                    ? ParseSchema<Spec, { type: Head | Tail } & Omit<Raw, 'type'>, Options>
                                     : never
                     : Raw extends { enum: (infer Item)[] }
                       ? Item
@@ -180,20 +200,46 @@ export type ParseSchema<Spec, RawSchema> =
                           : Raw extends false
                             ? never
                             : Raw extends { allOf: [infer Head, ...infer Tail] }
-                              ? ParseSchema<Spec, Head> & ParseSchema<Spec, { allOf: Tail }>
+                              ? ParseSchema<Spec, Head, Options> & ParseSchema<Spec, { allOf: Tail }, Options>
                               : Raw extends { anyOf: [infer Head, ...infer Tail] }
-                                ? Partial<ParseSchema<Spec, Head>> & ParseSchema<Spec, { anyOf: Tail }>
+                                ? Options['anyOfIntersection'] extends true
+                                    ? Partial<ParseSchema<Spec, Head, Options>> &
+                                          ParseSchema<Spec, { anyOf: Tail }, Options>
+                                    : ParseSchema<Spec, Head | Tail[number], Options>
                                 : Raw extends { oneOf: [infer Head, ...infer Tail] }
-                                  ? Partial<ParseSchema<Spec, Head>> & ParseSchema<Spec, { oneOf: Tail }>
-                                  : StrictParseSchemaObject<Spec, Raw>)
+                                  ? Options['oneOfIntersection'] extends true
+                                      ? Partial<ParseSchema<Spec, Head, Options>> &
+                                            ParseSchema<Spec, { oneOf: Tail }, Options>
+                                      : ParseSchema<Spec, Head | Tail[number], Options>
+                                  : StrictParseSchemaObject<Spec, Raw, Options>)
               | (Raw extends { nullable: true } ? null : never)
         : never
+
+/**
+ * Parse an array schema into an `Item[]` from its `items` schema, or into a tuple when `prefixItems` is present.
+ *
+ * With `prefixItems`, each entry becomes a positional tuple element and `items` then types everything past the
+ * prefix: a schema makes it a rest element, `false` closes the tuple, and an absent `items` leaves the tuple open
+ * as `...unknown[]`.
+ *
+ * `prefixItems` entries are treated as required; `minItems`/`maxItems` are not taken into account.
+ */
+type StrictParseSchemaArray<Spec, Raw, Options extends ParserOptions> = Raw extends {
+    prefixItems: infer Prefix extends unknown[]
+}
+    ? [
+          ...{ [Index in keyof Prefix]: ParseSchema<Spec, Prefix[Index], Options> },
+          ...(Raw extends { items: false } ? [] : ParseSchema<Spec, Get<Raw, 'items', true>, Options>[]),
+      ]
+    : Raw extends { items: infer Item }
+      ? ParseSchema<Spec, Item, Options>[]
+      : never
 
 /**
  * Parse an object schema into a record type: `required` properties stay mandatory, the rest become optional,
  * and `additionalProperties` adds an index signature.
  */
-type StrictParseSchemaObject<Spec, Raw> = Raw extends (
+type StrictParseSchemaObject<Spec, Raw, Options extends ParserOptions> = Raw extends (
     | { type: 'object'; properties?: infer Properties }
     | { type?: never; properties: infer Properties }
     | { type?: never; additionalProperties: infer Additional }
@@ -201,19 +247,17 @@ type StrictParseSchemaObject<Spec, Raw> = Raw extends (
     ? {
           [K in keyof Properties as K extends Default<Required, string[], []>[number] ? K : never]: ParseSchema<
               Spec,
-              Properties[K]
+              Properties[K],
+              Options
           >
       } & {
           [K in keyof Properties as K extends Default<Required, string[], []>[number] ? never : K]?: ParseSchema<
               Spec,
-              Properties[K]
+              Properties[K],
+              Options
           >
-      } & (unknown extends Additional ? unknown : { [_: string]: ParseSchema<Spec, Additional> })
+      } & (unknown extends Additional ? unknown : { [_: string]: ParseSchema<Spec, Additional, Options> })
     : never
-
-/** Parse an array schema into `Item[]` from its `items` schema. */
-// TODO: implement prefixItems
-type StrictParseSchemaArray<Spec, Raw> = Raw extends { items: infer Item } ? ParseSchema<Spec, Item>[] : never
 
 /**
  * Simplified version of OpenAPI Specification Types for reference.
@@ -303,6 +347,9 @@ type Schema =
 
           // arrays
           items?: Schema | Reference
+          prefixItems?: (Schema | Reference)[]
+          minItems?: number
+          maxItems?: number
 
           // objects
           required?: string[]
