@@ -102,7 +102,13 @@ type ParseParameter<Spec, RawParam, In, Options extends ParserOptions> =
             ? (
                   Raw extends { explode: true }
                       ? ParseSchema<Spec, Get<Raw, 'schema'>, Options>
-                      : { [K in Name]: ParseSchema<Spec, Get<Raw, 'schema'>, Options> }
+                      : {
+                            [K in Name]: ParseSchema<Spec, Get<Raw, 'schema'>, Options> extends infer Param
+                                ? Param extends (infer Item)[]
+                                    ? Param | Item
+                                    : Param
+                                : never
+                        }
               ) extends infer Param
                 ? Raw extends { required: true } | { in: 'path' }
                     ? Param
