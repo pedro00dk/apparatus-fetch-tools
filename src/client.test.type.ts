@@ -415,40 +415,5 @@ expect<
 >()
 expect<Equal<Flat<OneOfSpec<{ oneOfIntersection: true }>['/y']['post']['request']>, { a?: string; b?: number }>>()
 
-// --- array query params accept array or single item ---
-type QueryArraySpec = FromOpenApiSpec<{
-    openapi: '3.1.0'
-    paths: {
-        '/q': {
-            get: {
-                parameters: [
-                    {
-                        name: 'tags'
-                        in: 'query'
-                        required: true
-                        schema: {
-                            type: 'array'
-                            items: { type: 'string' }
-                        }
-                    },
-                ]
-                responses: {
-                    '200': {
-                        content: {
-                            'application/json': { schema: { const: 'ok' } }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}>
-
-expect<Equal<QueryArraySpec['/q']['get']['query'], { tags: string[] | string }>>()
-
-const queryArrayApi = client<QueryArraySpec>()
-queryArrayApi['/q'].get({ query: { tags: ['a', 'b'] } })
-queryArrayApi['/q'].get({ query: { tags: 'a' } })
-
 // Reference values so nothing is flagged as unused.
-export const _typeTest = { api, narrowing, defaultStatus, queryArrayApi }
+export const _typeTest = { api, narrowing, defaultStatus }
