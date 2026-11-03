@@ -56,7 +56,7 @@ export const call = async (
     const cookies = Object.entries({
         ...Object.fromEntries(headers['cookie']?.split(';').map(c => c.trim().split('=')) ?? []),
         ...options.reduce<{ [_ in string]?: string }>(($, { cookie }) => Object.assign($, cookie), {}),
-    })
+    }).filter(([, value]) => value != undefined)
     if (cookies.length) headers['cookie'] = cookies.map(([key, value]) => `${key}=${value}`).join('; ')
 
     method = method.toUpperCase()

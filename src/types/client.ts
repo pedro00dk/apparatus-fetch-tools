@@ -24,8 +24,8 @@ export type DefaultSpec<Methods extends string = DefaultMethod> = {
         [Method in Methods]: {
             path?: { [_ in string]: unknown }
             query?: { [_ in string]: unknown }
-            header?: { [_ in string]: string }
-            cookie?: { [_ in string]: string }
+            header?: { [_ in string]?: string }
+            cookie?: { [_ in string]?: string }
             request?: BodyInit | object | string | number | bigint | boolean | null | undefined
             responses: { [_ in number]: unknown }
         }

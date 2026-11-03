@@ -47,6 +47,20 @@ test('request body serialize', async () => {
     expect(spy).toHaveBeenCalledWith('application/json', '{}')
 })
 
+test('request undefined parameters', async () => {
+    const spy = mock((..._: unknown[]) => {})
+    msw.use(
+        http.get(url, ({ request }) => {
+            const { headers, url } = request
+            spy(headers.get('x-a'), headers.get('x-b'), headers.get('cookie'), new URL(url).search)
+            return new HttpResponse()
+        }),
+    )
+    const api = client({ url, header: { 'x-a': 'a', 'x-b': undefined }, cookie: { a: 'a', b: undefined } })
+    await api[''].get({ query: { a: 'a', b: undefined } })
+    expect(spy).toHaveBeenCalledWith('a', null, 'a=a', '?a=a')
+})
+
 test('response body parse', async () => {
     const params = new URLSearchParams()
     const paramsInit = { headers: { 'content-type': 'application/x-www-form-urlencoded' } }
