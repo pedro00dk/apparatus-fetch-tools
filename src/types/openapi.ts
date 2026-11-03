@@ -167,52 +167,51 @@ type ParseBody<Spec, RawBody, In, Options extends ParserOptions> =
  */
 export type ParseSchema<Spec, RawSchema, Options extends ParserOptions> =
     Deref<Spec, RawSchema> extends infer Raw
-        ?
-              | (Raw extends {
-                    type: infer Type
-                    const?: never
-                    enum?: never
-                    allOf?: never
-                    anyOf?: never
-                    oneOf?: never
-                }
-                    ? Type extends 'string'
-                        ? string
-                        : Type extends 'object'
-                          ? StrictParseSchemaObject<Spec, Raw, Options>
-                          : Type extends 'array'
-                            ? StrictParseSchemaArray<Spec, Raw, Options>
-                            : Type extends 'number' | 'integer'
-                              ? number
-                              : Type extends 'boolean'
-                                ? boolean
-                                : Type extends 'null'
-                                  ? null
-                                  : Type extends [infer Head, ...infer Tail]
-                                    ? ParseSchema<Spec, { type: Head | Tail } & Omit<Raw, 'type'>, Options>
-                                    : never
-                    : Raw extends { enum: (infer Item)[] }
-                      ? Item
-                      : Raw extends { const: infer Const }
-                        ? Const
-                        : Raw extends true | { allOf: [] } | { anyOf: [] } | { oneOf: [] }
-                          ? unknown
-                          : Raw extends false
-                            ? never
-                            : Raw extends { allOf: [infer Head, ...infer Tail] }
-                              ? ParseSchema<Spec, Head, Options> & ParseSchema<Spec, { allOf: Tail }, Options>
-                              : Raw extends { anyOf: [infer Head, ...infer Tail] }
-                                ? Options['anyOfIntersection'] extends true
-                                    ? Partial<ParseSchema<Spec, Head, Options>> &
-                                          ParseSchema<Spec, { anyOf: Tail }, Options>
-                                    : ParseSchema<Spec, Head | Tail[number], Options>
-                                : Raw extends { oneOf: [infer Head, ...infer Tail] }
-                                  ? Options['oneOfIntersection'] extends true
-                                      ? Partial<ParseSchema<Spec, Head, Options>> &
-                                            ParseSchema<Spec, { oneOf: Tail }, Options>
-                                      : ParseSchema<Spec, Head | Tail[number], Options>
-                                  : StrictParseSchemaObject<Spec, Raw, Options>)
-              | (Raw extends { nullable: true } ? null : never)
+        ? | (Raw extends {
+                type: infer Type
+                const?: never
+                enum?: never
+                allOf?: never
+                anyOf?: never
+                oneOf?: never
+            }
+                ? Type extends 'string'
+                    ? string
+                    : Type extends 'object'
+                      ? StrictParseSchemaObject<Spec, Raw, Options>
+                      : Type extends 'array'
+                        ? StrictParseSchemaArray<Spec, Raw, Options>
+                        : Type extends 'number' | 'integer'
+                          ? number
+                          : Type extends 'boolean'
+                            ? boolean
+                            : Type extends 'null'
+                              ? null
+                              : Type extends [infer Head, ...infer Tail]
+                                ? ParseSchema<Spec, { type: Head | Tail } & Omit<Raw, 'type'>, Options>
+                                : never
+                : Raw extends { enum: (infer Item)[] }
+                  ? Item
+                  : Raw extends { const: infer Const }
+                    ? Const
+                    : Raw extends true | { allOf: [] } | { anyOf: [] } | { oneOf: [] }
+                      ? unknown
+                      : Raw extends false
+                        ? never
+                        : Raw extends { allOf: [infer Head, ...infer Tail] }
+                          ? ParseSchema<Spec, Head, Options> & ParseSchema<Spec, { allOf: Tail }, Options>
+                          : Raw extends { anyOf: [infer Head, ...infer Tail] }
+                            ? Options['anyOfIntersection'] extends true
+                                ? Partial<ParseSchema<Spec, Head, Options>> &
+                                      ParseSchema<Spec, { anyOf: Tail }, Options>
+                                : ParseSchema<Spec, Head | Tail[number], Options>
+                            : Raw extends { oneOf: [infer Head, ...infer Tail] }
+                              ? Options['oneOfIntersection'] extends true
+                                  ? Partial<ParseSchema<Spec, Head, Options>> &
+                                        ParseSchema<Spec, { oneOf: Tail }, Options>
+                                  : ParseSchema<Spec, Head | Tail[number], Options>
+                              : StrictParseSchemaObject<Spec, Raw, Options>)
+          | (Raw extends { nullable: true } ? null : never)
         : never
 
 /**

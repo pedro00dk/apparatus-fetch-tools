@@ -36,16 +36,7 @@ export type DefaultSpec<Methods extends string = DefaultMethod> = {
  * HTTP methods for the {@linkcode DefaultSpec}.
  */
 export type DefaultMethod =
-    | 'get'
-    | 'post'
-    | 'put'
-    | 'patch'
-    | 'delete'
-    | 'head'
-    | 'options'
-    | 'trace'
-    | 'connect'
-    | 'query'
+    'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options' | 'trace' | 'connect' | 'query'
 
 /**
  * Create a typed fetch client based on the provided {@linkcode ClientSpec}.

@@ -1,0 +1,15 @@
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "jkillian.custom-local-formatters",
+    "[typescript]": { "editor.defaultFormatter": "jkillian.custom-local-formatters" },
+    "[json]": { "editor.defaultFormatter": "jkillian.custom-local-formatters" },
+    "[yaml]": { "editor.defaultFormatter": "jkillian.custom-local-formatters" },
+    "[markdown]": { "editor.defaultFormatter": "jkillian.custom-local-formatters" },
+    "[toml]": { "editor.defaultFormatter": "jkillian.custom-local-formatters" },
+    "customLocalFormatters.formatters": [
+        {
+            "command": "bun fmt --no-script --stdin-filepath ${file}",
+            "languages": ["typescript", "json", "yaml", "markdown", "toml"]
+        }
+    ]
+}

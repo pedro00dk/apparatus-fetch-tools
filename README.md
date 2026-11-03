@@ -56,7 +56,10 @@ const api = client({
 })
 
 // adds query params: https://api.example.com/users/123?version=1.0&apiKey=xyz&orderBy=name
-await api.get('/users/{id}', { path: { id: '123' }, query: { orderBy: 'name' } })
+await api.get('/users/{id}', {
+    path: { id: '123' },
+    query: { orderBy: 'name' },
+})
 ```
 
 ### Timeouts and retries
@@ -148,7 +151,10 @@ const myApi: Client<FromOpenApiSpec<MyApiSpec>> = client({ url })
 The one pattern that blows up is assigning clients through a **union-keyed index**. Writing to `record[key]` where `key` is a union of keys forces the assigned value to satisfy the intersection of every entry's type. With a record of differently-typed clients, that intersection merges every path of every spec into one giant type, and the `client()` call is then reverse-mapped against it — turning a lazy type into a fully materialized one:
 
 ```ts
-type Api = { a: Client<FromOpenApiSpec<SpecA>>; b: Client<FromOpenApiSpec<SpecB>> }
+type Api = {
+    a: Client<FromOpenApiSpec<SpecA>>
+    b: Client<FromOpenApiSpec<SpecB>>
+}
 
 // 🐌 record[key] with key: 'a' | 'b' → value must match Client<A> & Client<B>
 const api = Object.entries(urls).reduce(($, [key, url]) => (($[key as keyof Api] = client({ url })), $), {} as Api)
