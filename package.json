@@ -33,9 +33,7 @@
         }
     },
     "scripts": {
-        "build": "tsc && bun build --outdir ./dist/ ./src/index.ts",
-        "test": "bun test",
-        "fmt": "bun fmt"
+        "build": "bun build --check --outdir ./dist/ ./src/index.ts"
     },
     "dependencies": {},
     "devDependencies": {
