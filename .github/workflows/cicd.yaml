@@ -1,11 +1,13 @@
-name: publish package
+name: CICD
 
 on:
+    push:
+        branches: [main]
     release:
         types: [published]
 
 jobs:
-    publish:
+    ci:
         runs-on: ubuntu-latest
 
         permissions:
@@ -21,6 +23,9 @@ jobs:
             - name: Install dependencies
               run: bun install --frozen-lockfile
 
+            - name: Check types
+              run: bun check
+
             - name: Test package
               run: bun run test
 
@@ -28,6 +33,7 @@ jobs:
               run: bun run build
 
             - name: Publish package
+              if: github.event_name == 'release'
               run: |
                   bun install -g npm@latest
                   bun x npm publish --provenance --access public

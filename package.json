@@ -1,30 +1,30 @@
 {
     "name": "@_apparatus_/fetch-tools",
-    "description": "A thin wrapper for `fetch` with an `axios` inspired API.",
     "version": "4.2.0",
-    "type": "module",
+    "description": "A thin wrapper for `fetch` with an `axios` inspired API.",
+    "keywords": [
+        "api",
+        "axios",
+        "client",
+        "fetch",
+        "get",
+        "http",
+        "node-fetch",
+        "request",
+        "response",
+        "rest",
+        "url"
+    ],
     "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/pedro00dk/apparatus-fetch-tools"
-    },
     "author": {
         "name": "Pedro Henrique",
         "email": "pedro00dk@gmail.com"
     },
-    "keywords": [
-        "fetch",
-        "client",
-        "request",
-        "response",
-        "http",
-        "api",
-        "rest",
-        "get",
-        "url",
-        "axios",
-        "node-fetch"
-    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/pedro00dk/apparatus-fetch-tools"
+    },
+    "type": "module",
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
@@ -32,17 +32,16 @@
             "types": "./dist/index.d.ts"
         }
     },
-    "packageManager": "bun@1.4.4",
-    "dependencies": {},
-    "devDependencies": {
-        "@types/bun": "1.4.4",
-        "form-data": "4.0.6",
-        "msw": "2.15.0",
-        "typescript": "7.0.2"
-    },
     "scripts": {
         "build": "tsc && bun build --outdir ./dist/ ./src/index.ts",
         "test": "bun test",
         "fmt": "bun fmt"
-    }
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/bun": "1.4.4",
+        "form-data": "4.0.6",
+        "msw": "2.15.0"
+    },
+    "packageManager": "bun@1.4.4"
 }

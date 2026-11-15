@@ -111,9 +111,9 @@ test('retry', async () => {
     await expect(api[''].get({ retry: 2 })).resolves.toBeDefined()
 })
 
-test('types (tsc --noEmit)', () => {
-    const tsc = Bun.spawnSync(['node_modules/.bin/tsc', '--noEmit'], { stdout: 'pipe', stderr: 'pipe' })
-    const output = (tsc.stdout.toString() + tsc.stderr.toString()).trim()
-    if (tsc.exitCode !== 0) console.error(output)
-    expect(tsc.exitCode).toBe(0)
+test('types (bun check)', () => {
+    const check = Bun.spawnSync(['bun', 'check', 'src/client.test.type.ts'], { stdout: 'pipe', stderr: 'pipe' })
+    const output = (check.stdout.toString() + check.stderr.toString()).trim()
+    if (check.exitCode !== 0) console.error(output)
+    expect(check.exitCode).toBe(0)
 })
