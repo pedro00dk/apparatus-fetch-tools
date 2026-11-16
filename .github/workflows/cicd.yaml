@@ -7,7 +7,7 @@ on:
         types: [published]
 
 jobs:
-    ci:
+    cicd:
         runs-on: ubuntu-latest
 
         permissions:
